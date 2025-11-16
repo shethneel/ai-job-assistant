@@ -10,4 +10,4 @@ pypdf
 openai
 python-jose
 passlib[bcrypt]
-email-validator
+email_validator
