@@ -2,7 +2,6 @@ fastapi
 uvicorn
 sqlmodel
 sqlalchemy
-psycopg2-binary
 python-dotenv
 python-multipart
 python-docx
@@ -10,4 +9,4 @@ pypdf
 openai
 python-jose
 passlib[bcrypt]
-email_validator
+email-validator
