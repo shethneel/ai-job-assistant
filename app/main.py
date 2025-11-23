@@ -1,7 +1,7 @@
 # app/main.py
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # load .env for local dev
 
 import os
 from fastapi import FastAPI
@@ -18,14 +18,14 @@ from app.api.routes_tailored_resume import router as tailored_resume_router
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="AI Job Assistant API", version="1.0.0")
+    app = FastAPI(title="AI Job Assistant API")
 
-    # ---------- CORS ----------
+    # ---- CORS for Vercel / local dev ----
     origins_env = os.getenv("CORS_ORIGINS")
     if origins_env:
         origins = [o.strip() for o in origins_env.split(",") if o.strip()]
     else:
-        # Local dev: allow everything
+        # local dev
         origins = ["*"]
 
     app.add_middleware(
@@ -36,17 +36,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ---------- Routers ----------
-    app.include_router(health_router, prefix="/health")
-    app.include_router(resume_router, prefix="/resume")
-    app.include_router(cover_letter_router)
-    app.include_router(auth_router)
-    app.include_router(user_resume_router)
-    app.include_router(job_match_router)
-    app.include_router(tailored_resume_router)
+    # ---- Routers ----
+    app.include_router(health_router, prefix="/health", tags=["health"])
+    app.include_router(resume_router, prefix="/resume", tags=["resume"])
+    app.include_router(cover_letter_router, tags=["cover-letter"])
+    app.include_router(auth_router, tags=["auth"])
+    app.include_router(user_resume_router, tags=["user-resume"])
+    app.include_router(job_match_router, tags=["job-match"])
+    app.include_router(tailored_resume_router, tags=["tailored-resume"])
 
     @app.get("/")
-    async def root():
+    def root():
         return {"status": "ok", "message": "AI Job Assistant API"}
 
     return app

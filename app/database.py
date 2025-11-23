@@ -2,14 +2,14 @@
 import os
 from sqlmodel import SQLModel, create_engine, Session
 
-# DATABASE_URL will come from Supabase in production (Railway env var)
+# Use Supabase Postgres in production, SQLite for local dev
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
-    # Supabase Postgres / any external DB
+    # Supabase (or any other Postgres)
     engine = create_engine(DATABASE_URL, echo=False)
 else:
-    # Local dev fallback – simple SQLite file in the repo
+    # Local dev fallback (SQLite)
     engine = create_engine(
         "sqlite:///./app.db",
         echo=False,
@@ -20,8 +20,7 @@ else:
 def init_db() -> None:
     """
     Create all tables if they don't exist yet.
-    This will run against SQLite locally, and Postgres on Railway
-    (as long as DATABASE_URL is set).
+    Called once on startup (both locally and on Render).
     """
     from app import models  # make sure models are imported
 
@@ -29,9 +28,6 @@ def init_db() -> None:
 
 
 def get_db():
-    """
-    Dependency for FastAPI routes.
-    Usage: Depends(get_db)
-    """
+    """FastAPI dependency for DB sessions."""
     with Session(engine) as session:
         yield session

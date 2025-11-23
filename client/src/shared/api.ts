@@ -1,14 +1,15 @@
-// src/shared/api.ts
+// client/src/shared/api.ts
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-export { API_BASE_URL };
-
-export async function apiFetch(path: string, options: RequestInit = {}) {
+export async function apiFetch(
+  path: string,
+  options: RequestInit = {}
+) {
   const token = localStorage.getItem("token");
   const headers = new Headers(options.headers || {});
 
-  // Only set JSON content-type when not sending FormData
+  // Only set JSON content-type if NOT sending FormData
   if (!(options.body instanceof FormData)) {
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
@@ -25,12 +26,15 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   });
 
   if (!res.ok) {
-    const msg = await res.text();
-    throw new Error(msg || `Request failed: ${res.status}`);
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
   }
 
-  // If there is no content, just return null
-  if (res.status === 204) return null;
+  // If the response has no body (204 etc.), avoid json() error
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return null;
+  }
 
   return res.json();
 }
