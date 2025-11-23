@@ -10,3 +10,4 @@ pypdf
 python-jose
 passlib[bcrypt]
 psycopg2-binary
+email_validator
