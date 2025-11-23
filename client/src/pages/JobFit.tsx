@@ -1,181 +1,242 @@
-// src/pages/JobFit.tsx
 import { useState } from "react";
-import { apiFetch } from "../shared/api";
 
-interface JobMatchResponse {
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
+type JobFitResult = {
   match_score: number;
   strong_points: string[];
   missing_skills: string[];
   red_flags: string[];
   recommendations: string[];
-}
+};
 
 export default function JobFit() {
   const [jobDescription, setJobDescription] = useState("");
-  const [result, setResult] = useState<JobMatchResponse | null>(null);
+  const [result, setResult] = useState<JobFitResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [needsLogin, setNeedsLogin] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
-  const handleAnalyze = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  async function handleAnalyze() {
+    const job_description = jobDescription.trim();
+    const token = localStorage.getItem("token");
+
     setResult(null);
-    setNeedsLogin(false);
 
-    if (!jobDescription.trim()) {
-      setError("Please paste the job description first.");
+    if (!token) {
+      setStatus("Please log in and save a resume first.");
+      return;
+    }
+
+    if (!job_description) {
+      setStatus("Paste a job description first.");
       return;
     }
 
     setIsLoading(true);
+    setStatus("Analyzing how well this role matches your saved resume…");
+
     try {
-      const data = (await apiFetch("/job-match/analyze-from-saved", {
-        method: "POST",
-        body: JSON.stringify({ job_description: jobDescription }),
-      })) as JobMatchResponse;
+      const res = await fetch(
+        `${API_BASE_URL}/job-match/analyze-from-saved`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ job_description }),
+        }
+      );
 
-      setResult(data);
-    } catch (err: any) {
-      const msg = err?.message || "";
-
-      if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
-        setNeedsLogin(true);
-      } else {
-        setError(msg || "Failed to analyze job fit.");
+      if (res.status === 404) {
+        setStatus(
+          "We couldn’t find a saved resume for your account. Upload and save a resume first."
+        );
+        return;
       }
+
+      if (res.status === 429) {
+        const data = await res.json().catch(() => null);
+        setStatus(
+          data?.detail ||
+            "You’ve hit today’s analysis limit. Try again tomorrow."
+        );
+        return;
+      }
+
+      if (!res.ok) {
+        const raw = await res.text();
+        console.error("Job fit error:", raw);
+        throw new Error(
+          "We couldn’t analyze this job right now. Please try again."
+        );
+      }
+
+      const data = await res.json();
+      setResult({
+        match_score: data.match_score,
+        strong_points: data.strong_points || [],
+        missing_skills: data.missing_skills || [],
+        red_flags: data.red_flags || [],
+        recommendations: data.recommendations || [],
+      });
+      setStatus("Analysis ready – see your job fit insights on the right.");
+    } catch (err: any) {
+      console.error(err);
+      setStatus(
+        err?.message ||
+          "Something went wrong while analyzing this job. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-      <div className="max-w-3xl mb-8">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
-          Check your fit for a role
-        </h1>
-        <p className="text-gray-600 text-sm sm:text-base">
-          Paste a job description and we’ll analyze how well your saved resume
-          matches it, where you shine, and what might be missing.
-        </p>
-      </div>
-
-      <form
-        onSubmit={handleAnalyze}
-        className="grid md:grid-cols-[1.2fr,1.3fr] gap-8 items-start"
-      >
-        {/* Input side */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-800">
-              Job description
-            </label>
-            <textarea
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm min-h-[260px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Paste the job description here..."
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-            />
-          </div>
-
-          {needsLogin && (
-            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Please log in and upload a resume first. We use your saved resume
-              to calculate the match against this job.
-            </p>
-          )}
-
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          >
-            {isLoading ? "Analyzing..." : "Analyze job fit"}
-          </button>
-        </div>
-
-        {/* Results side */}
-        <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700">
-            Match insights
-          </h2>
-
-          {isLoading && (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
-              Comparing your saved resume against this job posting...
-            </div>
-          )}
-
-          {!isLoading && !result && !error && !needsLogin && (
-            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
-              Once you analyze a job, we’ll show your match score, strengths,
-              gaps, and recommendations here.
-            </div>
-          )}
-
-          {result && (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-gray-200 bg-white px-4 py-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase text-gray-500">
-                    Overall match
-                  </span>
-                  <span className="text-2xl font-bold text-blue-600">
-                    {Math.round(result.match_score)}%
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500">
-                  Higher is better. This is a rough AI estimate, not a
-                  guarantee — use it as guidance.
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <InsightCard title="Strong points" items={result.strong_points} />
-                <InsightCard
-                  title="Missing skills"
-                  items={result.missing_skills}
-                />
-                <InsightCard title="Red flags" items={result.red_flags} />
-                <InsightCard
-                  title="Recommendations"
-                  items={result.recommendations}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function InsightCard({
-  title,
-  items,
-}: {
-  title: string;
-  items: string[];
-}) {
-  if (!items || items.length === 0) return null;
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-        {title}
-      </h3>
-      <ul className="space-y-1.5 text-sm text-gray-800 list-disc list-inside">
+  function renderList(items: string[], emptyText: string) {
+    if (!items.length) {
+      return <p className="text-xs text-slate-400">{emptyText}</p>;
+    }
+    return (
+      <ul className="list-disc space-y-1 pl-4 text-xs text-slate-700">
         {items.map((item, idx) => (
           <li key={idx}>{item}</li>
         ))}
       </ul>
+    );
+  }
+
+  return (
+    <div className="bg-slate-50 min-h-screen">
+      <main className="max-w-6xl mx-auto px-4 py-12">
+        <section>
+          <h1 className="text-3xl font-bold text-slate-900">
+            Job Fit Analysis
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">
+            Paste a job description and we&apos;ll compare it against your saved
+            resume, highlighting match score, strengths, gaps, and practical
+            recommendations.
+          </p>
+
+          <div className="mt-10 grid gap-8 md:grid-cols-2">
+            {/* Left card – JD input */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Job Description
+              </h2>
+              <textarea
+                rows={14}
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+                placeholder="Paste the full job description here..."
+                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              />
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleAnalyze}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <span className="text-base">📊</span>
+                  <span>{isLoading ? "Analyzing…" : "Analyze Job Fit"}</span>
+                </button>
+              </div>
+
+              {status && (
+                <p className="mt-3 text-xs text-slate-600">{status}</p>
+              )}
+            </div>
+
+            {/* Right card – results */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Insights
+              </h2>
+
+              {!result && (
+                <p className="text-xs text-slate-500">
+                  Once you run the analysis, we&apos;ll show your match score,
+                  strengths, gaps, and recommendations here.
+                </p>
+              )}
+
+              {result && (
+                <div className="space-y-4">
+                  {/* Match score card */}
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                      Match score
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-blue-700">
+                      {result.match_score}%
+                    </p>
+                    <p className="mt-1 text-xs text-blue-800">
+                      This is our estimate of how well your current resume aligns
+                      with this role.
+                    </p>
+                  </div>
+
+                  {/* Two-column insights */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                        Strong points
+                      </p>
+                      <div className="mt-2">
+                        {renderList(
+                          result.strong_points,
+                          "We’ll highlight where you’re already aligned."
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                        Missing skills
+                      </p>
+                      <div className="mt-2">
+                        {renderList(
+                          result.missing_skills,
+                          "We’ll surface skills and experience you may want to add."
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                        Red flags
+                      </p>
+                      <div className="mt-2">
+                        {renderList(
+                          result.red_flags,
+                          "Any potential concerns or mismatches will appear here."
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-800">
+                        Recommendations
+                      </p>
+                      <div className="mt-2">
+                        {renderList(
+                          result.recommendations,
+                          "We’ll suggest practical ways to improve your fit for this role."
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

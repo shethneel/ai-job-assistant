@@ -1,246 +1,383 @@
 // src/components/AuthModal.tsx
-import { useState } from "react";
-import { X, Mail, Lock, User } from "lucide-react";
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { apiFetch } from "../shared/api";
 
-interface AuthModalProps {
+type AuthMode = "login" | "signup";
+
+type AuthModalProps = {
   isOpen: boolean;
+  mode: AuthMode;
   onClose: () => void;
   onAuthSuccess: (email: string) => void;
-}
+};
 
-type Mode = "login" | "signup";
+const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  mode,
+  onClose,
+  onAuthSuccess,
+}) => {
+  const [activeTab, setActiveTab] = useState<AuthMode>(mode);
 
-export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
+  // shared fields
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-   // Prevent background scroll when modal is open
-    useEffect(() => {
+  // signup-only fields
+  const [fullName, setFullName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [targetRole, setTargetRole] = useState("");
+  const [experienceLevel, setExperienceLevel] = useState("");
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // When parent changes mode (Log in / Sign up)
+  useEffect(() => {
+    setActiveTab(mode);
+    setError(null);
+  }, [mode]);
+
+  // Reset form when modal opens/closes
+  useEffect(() => {
     if (isOpen) {
-        document.body.style.overflow = "hidden";
+      setError(null);
+      setIsLoading(false);
+      // don’t clear email so returning users see it
+      setPassword("");
+      setConfirmPassword("");
     } else {
-        document.body.style.overflow = "auto";
+      // close → fully reset
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      setFullName("");
+      setTargetRole("");
+      setExperienceLevel("");
+      setActiveTab("login");
+    }
+  }, [isOpen]);
+
+  // Close on Esc
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
+  // Turn backend / network errors into friendly text
+  function toFriendlyMessage(raw: string | null | undefined): string {
+    if (!raw) return "Something went wrong. Please try again.";
+
+    let msg = raw.trim();
+
+    // If backend sent JSON with {"detail": "..."}
+    if (msg.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed?.detail) msg = String(parsed.detail);
+      } catch {
+        // ignore JSON parse error
+      }
     }
 
-    return () => {
-        document.body.style.overflow = "auto";
-    };
-    }, [isOpen]);
+    if (msg.includes("Invalid email or password")) {
+      return "That email or password doesn’t look right. Please check your details and try again.";
+    }
+    if (msg.includes("Failed to fetch")) {
+      return "We couldn’t reach the server. Please make sure your internet is working and try again.";
+    }
 
-  const [mode, setMode] = useState<Mode>("login");
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+    return msg;
+  }
 
-  if (!isOpen) return null;
+  const handleLogin = async () => {
+    setError(null);
 
-  const resetForm = () => {
-    setEmail("");
-    setName("");
-    setPassword("");
-    setConfirmPassword("");
+    if (!email || !password) {
+      setError("Please enter both email and password.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const data = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const token = data?.access_token;
+      if (!token) {
+        throw new Error("Login failed. Please try again.");
+      }
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("userEmail", email);
+
+      onAuthSuccess(email);
+      onClose();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(toFriendlyMessage(message));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleClose = () => {
-    resetForm();
-    onClose();
+  const handleSignup = async () => {
+    setError(null);
+
+    if (!fullName.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (!email || !password || !confirmPassword) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password should be at least 6 characters long.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match. Please double-check.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Backend currently expects only email + password
+      await apiFetch("/auth/signup", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+
+      // Auto-login after successful signup
+      const loginRes = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const token = loginRes?.access_token;
+      if (token) {
+        localStorage.setItem("token", token);
+        localStorage.setItem("userEmail", email);
+      }
+
+      onAuthSuccess(email);
+      onClose();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(toFriendlyMessage(message));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (mode === "signup" && password !== confirmPassword) {
-      alert("Passwords do not match");
-      return;
+    if (activeTab === "login") {
+      void handleLogin();
+    } else {
+      void handleSignup();
     }
-
-    // TODO: replace this with real API calls
-    const fakeToken = "demo-token";
-    localStorage.setItem("token", fakeToken);
-    localStorage.setItem("userEmail", email);
-
-    onAuthSuccess(email);
-    handleClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl shadow-blue-500/10 overflow-hidden">
-        <div className="flex flex-col md:flex-row">
-          {/* Left side marketing / branding */}
-          <div className="hidden md:flex flex-1 flex-col justify-between bg-gradient-to-b from-blue-600 to-blue-700 p-8 text-white">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest opacity-80">
-                {mode === "login" ? "WELCOME BACK" : "JOIN CAREERBOOST"}
-              </p>
-              <h2 className="mt-3 text-2xl font-bold leading-snug">
-                {mode === "login"
-                  ? "Sign in to continue using CareerBoost"
-                  : "Create your CareerBoost account"}
-              </h2>
-              <p className="mt-4 text-sm text-blue-100">
-                Access enhanced resumes, tailored cover letters, and job-fit insights all in one place.
-              </p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      {/* backdrop click to close */}
+      <div
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-            <ul className="mt-6 space-y-2 text-xs text-blue-100/90">
-              <li>✓ Save and revisit your resume versions</li>
-              <li>✓ Quickly generate custom cover letters</li>
-              <li>✓ Track how well you match different roles</li>
-            </ul>
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {activeTab === "login" ? "Welcome back" : "Create your account"}
+            </h2>
+            <p className="text-xs text-gray-500">
+              {activeTab === "login"
+                ? "Log in to access your AI-powered career tools."
+                : "Sign up to start enhancing your resume and job search."}
+            </p>
           </div>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
 
-          {/* Right side form */}
-          <div className="flex-1 p-6 md:p-8 relative">
-            {/* Close button */}
+        <div className="px-6 pb-6 pt-3">
+          {/* Tabs */}
+          <div className="flex w-full mb-6 bg-gray-100 rounded-xl p-1">
             <button
-              onClick={handleClose}
-              className="absolute right-4 top-4 rounded-full border border-gray-200 p-1 hover:bg-gray-50"
+              type="button"
+              onClick={() => {
+                setActiveTab("login");
+                setError(null);
+              }}
+              className={
+                "flex-1 py-2 rounded-lg text-sm font-medium transition-all " +
+                (activeTab === "login"
+                  ? "bg-white shadow text-gray-900"
+                  : "text-gray-500 hover:text-gray-700")
+              }
             >
-              <X className="h-4 w-4 text-gray-500" />
+              Log in
             </button>
 
-            {/* Tabs */}
-            <div className="mb-6 flex rounded-full bg-gray-100 p-1 text-sm font-medium">
-              <button
-                type="button"
-                onClick={() => setMode("login")}
-                className={`flex-1 rounded-full py-2 ${
-                  mode === "login" ? "bg-white shadow-sm text-blue-600" : "text-gray-500"
-                }`}
-              >
-                Log in
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("signup")}
-                className={`flex-1 rounded-full py-2 ${
-                  mode === "signup" ? "bg-white shadow-sm text-blue-600" : "text-gray-500"
-                }`}
-              >
-                Sign up
-              </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("signup");
+                setError(null);
+              }}
+              className={
+                "flex-1 py-2 rounded-lg text-sm font-medium transition-all " +
+                (activeTab === "signup"
+                  ? "bg-white shadow text-gray-900"
+                  : "text-gray-500 hover:text-gray-700")
+              }
+            >
+              Sign up
+            </button>
+          </div>
+
+          {/* Error message */}
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {error}
             </div>
+          )}
 
-            <h3 className="mb-1 text-lg font-semibold text-gray-900">
-              {mode === "login" ? "Welcome back" : "Create your account"}
-            </h3>
-            <p className="mb-6 text-xs text-gray-500">
-              {mode === "login"
-                ? "Enter your email and password to access your dashboard."
-                : "Sign up to save your progress and track your job applications."}
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {mode === "signup" && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-700">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {activeTab === "signup" && (
+              <>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-700">
                     Full name
                   </label>
-                  <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
-                    <User className="mr-2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Alex Johnson"
-                      className="h-10 w-full border-0 bg-transparent text-sm outline-none"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">
-                  Email
-                </label>
-                <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
-                  <Mail className="mr-2 h-4 w-4 text-gray-400" />
                   <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="h-10 w-full border-0 bg-transparent text-sm outline-none"
+                    type="text"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="e.g. Roman Reigns"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                   />
                 </div>
-              </div>
+              </>
+            )}
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">
-                  Password
-                </label>
-                <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
-                  <Lock className="mr-2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="h-10 w-full border-0 bg-transparent text-sm outline-none"
-                  />
-                </div>
-              </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
 
-              {mode === "signup" && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-700">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-700">
+                Password
+              </label>
+              <input
+                type="password"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={activeTab === "login" ? "current-password" : "new-password"}
+              />
+            </div>
+
+            {activeTab === "signup" && (
+              <>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-700">
                     Confirm password
                   </label>
-                  <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
-                    <Lock className="mr-2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="password"
-                      required
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="h-10 w-full border-0 bg-transparent text-sm outline-none"
-                    />
-                  </div>
+                  <input
+                    type="password"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Re-enter your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
                 </div>
-              )}
 
-              {/* Small footer + button */}
-              <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                {mode === "login" ? (
-                  <span>
-                    New here?{" "}
-                    <button
-                      type="button"
-                      onClick={() => setMode("signup")}
-                      className="font-medium text-blue-600 hover:underline"
-                    >
-                      Create an account
-                    </button>
-                  </span>
-                ) : (
-                  <span>
-                    Already have an account?{" "}
-                    <button
-                      type="button"
-                      onClick={() => setMode("login")}
-                      className="font-medium text-blue-600 hover:underline"
-                    >
-                      Log in
-                    </button>
-                  </span>
-                )}
-              </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-700">
+                    Target role <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="e.g. Senior Backend Engineer"
+                    value={targetRole}
+                    onChange={(e) => setTargetRole(e.target.value)}
+                  />
+                </div>
 
-              <button
-                type="submit"
-                className="mt-2 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-              >
-                {mode === "login" ? "Log in" : "Create account"}
-              </button>
-            </form>
-          </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-700">
+                    Experience level{" "}
+                    <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <select
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={experienceLevel}
+                    onChange={(e) => setExperienceLevel(e.target.value)}
+                  >
+                    <option value="">Select one</option>
+                    <option value="junior">Junior</option>
+                    <option value="mid">Mid-level</option>
+                    <option value="senior">Senior</option>
+                    <option value="lead">Lead / Staff+</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="mt-2 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isLoading
+                ? activeTab === "login"
+                  ? "Logging in..."
+                  : "Creating account..."
+                : activeTab === "login"
+                ? "Log in"
+                : "Sign up"}
+            </button>
+
+            <p className="mt-2 text-center text-[10px] text-gray-400">
+              By continuing, you agree to our Terms of Service and Privacy Policy.
+            </p>
+          </form>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default AuthModal;

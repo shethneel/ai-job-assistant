@@ -1,31 +1,70 @@
-// src/components/Header.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BriefcaseBusiness } from "lucide-react";
+import { BriefcaseBusiness, ChevronDown } from "lucide-react";
 import AuthModal from "./AuthModal";
 
-export default function Header() {
-  const [user, setUser] = useState<string | null>(null);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const navigate = useNavigate();
+type AuthMode = "login" | "signup";
 
+export default function Header() {
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const navigate = useNavigate();
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Load user from localStorage on mount
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
       const savedEmail = localStorage.getItem("userEmail");
-      setUser(savedEmail || "User");
+      setUserEmail(savedEmail || "user@example.com");
     }
   }, []);
+
+  // Close profile dropdown on outside click / Esc
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    function handleClick(e: MouseEvent) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [isMenuOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("userEmail");
-    setUser(null);
+    setUserEmail(null);
+    setIsMenuOpen(false);
     navigate("/");
   };
 
   const handleAuthSuccess = (email: string) => {
-    setUser(email);
+    setUserEmail(email);
+    localStorage.setItem("userEmail", email);
+    setIsAuthOpen(false);
+  };
+
+  const getInitial = (email: string | null) => {
+    if (!email) return "?";
+    return email.trim()[0]?.toUpperCase() || "?";
   };
 
   return (
@@ -42,36 +81,95 @@ export default function Header() {
 
           {/* Nav links */}
           <nav className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
-            <Link to="/" className="hover:text-blue-600">Home</Link>
-            <Link to="/enhance-resume" className="hover:text-blue-600">Enhance Resume</Link>
-            <Link to="/cover-letter" className="hover:text-blue-600">Cover Letter</Link>
-            <Link to="/job-fit" className="hover:text-blue-600">Job Fit</Link>
+            <Link to="/" className="hover:text-blue-600">
+              Home
+            </Link>
+            <Link to="/enhance-resume" className="hover:text-blue-600">
+              Enhance Resume
+            </Link>
+            <Link to="/cover-letter" className="hover:text-blue-600">
+              Cover Letter
+            </Link>
+            <Link to="/job-fit" className="hover:text-blue-600">
+              Job Fit
+            </Link>
           </nav>
 
-          {/* Right Side */}
-          <div className="flex items-center gap-4">
-            {/* Not logged in → show CTA that opens modal */}
-            {!user && (
-              <button
-                onClick={() => setIsAuthOpen(true)}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 shadow-sm"
-              >
-                Get Started
-              </button>
+          {/* Right side */}
+          <div className="flex items-center gap-3">
+            {/* Logged OUT → Login + Sign up buttons */}
+            {!userEmail && (
+              <>
+                <button
+                  onClick={() => {
+                    setAuthMode("login");
+                    setIsAuthOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  type="button"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => {
+                    setAuthMode("signup");
+                    setIsAuthOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm"
+                  type="button"
+                >
+                  Sign up
+                </button>
+              </>
             )}
 
-            {/* Logged in → show email + logout */}
-            {user && (
-              <div className="flex items-center gap-3">
-                <span className="text-gray-600 text-sm">
-                  Hi, <span className="font-semibold text-gray-900">{user}</span>
-                </span>
+            {/* Logged IN → profile chip + dropdown */}
+            {userEmail && (
+              <div className="relative" ref={menuRef}>
                 <button
-                  onClick={handleLogout}
-                  className="text-red-600 text-sm font-medium hover:underline"
+                  onClick={() => setIsMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border bg-white text-sm shadow-sm hover:bg-gray-50"
+                  type="button"
                 >
-                  Logout
+                  <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
+                    {getInitial(userEmail)}
+                  </div>
+                  <span className="font-medium text-gray-800">Account</span>
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
                 </button>
+
+                {isMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl border bg-white shadow-lg py-2 text-sm">
+                    <button
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50"
+                      type="button"
+                    >
+                      Profile
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50"
+                      type="button"
+                    >
+                      Settings
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50"
+                      type="button"
+                    >
+                      Change password
+                    </button>
+
+                    <div className="my-1 border-t" />
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
+                      type="button"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -81,6 +179,7 @@ export default function Header() {
       {/* Auth Modal */}
       <AuthModal
         isOpen={isAuthOpen}
+        mode={authMode}
         onClose={() => setIsAuthOpen(false)}
         onAuthSuccess={handleAuthSuccess}
       />
