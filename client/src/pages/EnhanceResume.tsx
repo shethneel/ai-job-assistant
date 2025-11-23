@@ -1,186 +1,205 @@
+// src/pages/EnhanceResume.tsx
 import { useState } from "react";
-import { Upload, Wand2, Download, Save, CheckCircle2 } from "lucide-react";
+import { apiFetch } from "../shared/api";
+
+interface ImproveResumeResponse {
+  versions: string[];
+}
 
 export default function EnhanceResume() {
+  const [mode, setMode] = useState<"upload" | "paste">("upload");
+  const [file, setFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");
-  const [enhancedResume, setEnhancedResume] = useState("");
-  const [isEnhancing, setIsEnhancing] = useState(false);
-  const [savedResumes, setSavedResumes] = useState<
-    { id: string; name: string; content: string }[]
-  >([]);
+  const [versions, setVersions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleEnhance = async () => {
-    if (!resumeText.trim()) {
-      alert("Please enter your resume content");
-      return;
-    }
-
-    setIsEnhancing(true);
-
-    // Simulate AI enhancement
-    setTimeout(() => {
-      const enhanced = `✨ ENHANCED RESUME ✨
-
-${resumeText}
-
-[AI Enhancement Summary]
-- Added industry-specific keywords
-- Improved bullet point clarity
-- Enhanced action verbs
-- Quantified achievements where possible
-- Optimized formatting for ATS systems`;
-
-      setEnhancedResume(enhanced);
-      setIsEnhancing(false);
-    }, 2000);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] || null;
+    setFile(f);
   };
 
-  const handleSaveResume = () => {
-    if (!enhancedResume) {
-      alert("Please enhance your resume first");
-      return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+    setVersions([]);
+
+    try {
+      let data: ImproveResumeResponse;
+
+      if (mode === "upload") {
+        if (!file) {
+          setError("Please upload a resume file first.");
+          setIsLoading(false);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        data = await apiFetch("/resume/improve", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        if (!resumeText.trim()) {
+          setError("Please paste your resume text first.");
+          setIsLoading(false);
+          return;
+        }
+
+        data = await apiFetch("/resume/improve", {
+          method: "POST",
+          body: JSON.stringify({
+            resume_text: resumeText,
+          }),
+        });
+      }
+
+      setVersions(data.versions || []);
+    } catch (err: any) {
+      const msg = err?.message || "Failed to enhance resume.";
+      setError(msg);
+    } finally {
+      setIsLoading(false);
     }
-
-    const newResume = {
-      id: Date.now().toString(),
-      name: `Resume ${new Date().toLocaleDateString()}`,
-      content: enhancedResume,
-    };
-
-    setSavedResumes([...savedResumes, newResume]);
-    alert("Resume saved successfully!");
-  };
-
-  const handleDownload = (content: string) => {
-    const element = document.createElement("a");
-    const file = new Blob([content], { type: "text/plain" });
-    element.href = URL.createObjectURL(file);
-    element.download = `enhanced-resume-${Date.now()}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      <div className="max-w-3xl mb-8">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
+          Enhance your resume with AI
+        </h1>
+        <p className="text-gray-600 text-sm sm:text-base">
+          Upload your existing resume or paste it in. We’ll generate multiple
+          improved versions you can compare and tweak.
+        </p>
+      </div>
 
-      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-12">
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Enhance Your Resume
-            </h1>
-            <p className="text-lg text-gray-600">
-              Paste your resume below and let our AI enhance it with better
-              language, stronger action verbs, and optimized formatting.
-            </p>
-          </div>
+      {/* Mode toggle */}
+      <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 mb-6 text-sm">
+        <button
+          type="button"
+          onClick={() => setMode("upload")}
+          className={`px-4 py-2 rounded-lg font-medium transition ${
+            mode === "upload"
+              ? "bg-white shadow-sm text-gray-900"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          Upload file
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("paste")}
+          className={`px-4 py-2 rounded-lg font-medium transition ${
+            mode === "paste"
+              ? "bg-white shadow-sm text-gray-900"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          Paste text
+        </button>
+      </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-            {/* Input Section */}
-            <div className="flex flex-col">
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Your Resume
+      <form
+        onSubmit={handleSubmit}
+        className="grid md:grid-cols-[1.1fr,1.4fr] gap-8 items-start"
+      >
+        {/* Input column */}
+        <div className="space-y-5">
+          {mode === "upload" ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-800">
+                Resume file
+              </label>
+              <div className="border border-dashed border-gray-300 rounded-xl p-4 bg-gray-50">
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={handleFileChange}
+                  className="w-full text-sm text-gray-700"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  Supported: PDF, DOC, DOCX, or TXT. Max ~5MB recommended.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-800">
+                Paste your resume
               </label>
               <textarea
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm min-h-[260px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Paste your current resume here..."
                 value={resumeText}
                 onChange={(e) => setResumeText(e.target.value)}
-                placeholder="Paste your resume content here... (text format recommended)"
-                className="flex-1 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                rows={20}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Don’t include any passwords or super sensitive info – treat this
+                like you’re sending your resume to a recruiter.
+              </p>
+            </div>
+          )}
 
-              <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={handleEnhance}
-                  disabled={isEnhancing || !resumeText.trim()}
-                  className="flex-1 inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {isLoading ? "Enhancing..." : "Generate improved versions"}
+          </button>
+        </div>
+
+        {/* Output column */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-gray-700">
+            AI-enhanced versions
+          </h2>
+
+          {isLoading && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
+              Thinking about stronger bullets, clearer impact, and better
+              keywords...
+            </div>
+          )}
+
+          {!isLoading && versions.length === 0 && (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
+              Run your resume first – your improved versions will appear here.
+            </div>
+          )}
+
+          {versions.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-1">
+              {versions.map((v, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-3"
                 >
-                  <Wand2 className="h-5 w-5 mr-2" />
-                  {isEnhancing ? "Enhancing..." : "Enhance Resume"}
-                </button>
-                <button className="flex-1 inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-lg border-2 border-gray-300 text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition-all">
-                  <Upload className="h-5 w-5 mr-2" />
-                  Upload File
-                </button>
-              </div>
-            </div>
-
-            {/* Output Section */}
-            <div className="flex flex-col">
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Enhanced Resume
-              </label>
-              <textarea
-                value={enhancedResume}
-                readOnly
-                placeholder="Your enhanced resume will appear here..."
-                className="flex-1 w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 resize-none"
-                rows={20}
-              />
-
-              {enhancedResume && (
-                <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleSaveResume}
-                    className="flex-1 inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-all"
-                  >
-                    <Save className="h-5 w-5 mr-2" />
-                    Save Resume
-                  </button>
-                  <button
-                    onClick={() => handleDownload(enhancedResume)}
-                    className="flex-1 inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-lg border-2 border-gray-300 text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition-all"
-                  >
-                    <Download className="h-5 w-5 mr-2" />
-                    Download
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Saved Resumes */}
-          {savedResumes.length > 0 && (
-            <div className="border-t border-gray-200 pt-12">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Saved Resumes
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {savedResumes.map((resume) => (
-                  <div
-                    key={resume.id}
-                    className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
-                          <CheckCircle2 className="h-6 w-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {resume.name}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {resume.content.length} characters
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleDownload(resume.content)}
-                        className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                      >
-                        <Download className="h-5 w-5 text-gray-600" />
-                      </button>
-                    </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Version {i + 1}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                    {v}
+                  </pre>
+                </div>
+              ))}
             </div>
           )}
         </div>
-      </main>
-
+      </form>
     </div>
   );
 }
