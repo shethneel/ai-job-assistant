@@ -126,7 +126,7 @@ ${resumeText}
               {/* Quick Stats */}
               <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
                 <div className="p-4 rounded-lg bg-white border border-blue-200 hover:shadow-md transition-shadow">
-                  <p className="text-2xl font-bold text-blue-600">2 min</p>
+                  <p className="text-2xl font-bold text-blue-600">40 Seconds</p>
                   <p className="text-xs text-gray-600 mt-1">Time to enhance</p>
                 </div>
                 <div className="p-4 rounded-lg bg-white border border-purple-200 hover:shadow-md transition-shadow">

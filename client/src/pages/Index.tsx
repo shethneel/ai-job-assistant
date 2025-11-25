@@ -59,7 +59,7 @@ export default function Index() {
               {/* Social Proof Stats */}
               <div className="mt-16 grid grid-cols-3 gap-8 max-w-2xl mx-auto pt-12 border-t border-gray-200">
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-blue-600 mb-2">1000+</p>
+                  <p className="text-3xl font-bold text-blue-600 mb-2">130+</p>
                   <p className="text-sm text-gray-600">Students Helped</p>
                 </div>
                 <div className="text-center">
@@ -67,8 +67,8 @@ export default function Index() {
                   <p className="text-sm text-gray-600">Success Rate</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-blue-600 mb-2">2 min</p>
-                  <p className="text-sm text-gray-600">Resume Enhanced</p>
+                  <p className="text-3xl font-bold text-blue-600 mb-2">40 Seconds</p>
+                  <p className="text-sm text-gray-600">Time to enhance</p>
                 </div>
               </div>
             </div>
