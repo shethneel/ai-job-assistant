@@ -42,12 +42,8 @@ export default function JobFit() {
 
   const [copied, setCopied] = useState(false);
 
-  // Demo data for Saved Resume tab – visual only (no backend dependency)
-  const savedResumes = [
-    { id: 1, name: "Data Science Resume" },
-    { id: 2, name: "Software Engineer Resume" },
-    { id: 3, name: "Business Analyst Resume" },
-  ];
+  // No fake saved resumes. This will be wired to real backend data later.
+  const savedResumes: { id: string; name: string }[] = [];
 
   async function handleAnalyzeResume() {
     const job_description = jobDesc.trim();
@@ -62,15 +58,11 @@ export default function JobFit() {
     setStatus("Analyzing how well your resume fits this job…");
 
     try {
-      // ✅ Updated to match backend route
-      const res = await fetch(
-        `${API_BASE_URL}/job-fit/match/analyze-from-jd`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ job_description, resume_text }),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/job-fit/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_description, resume_text }),
+      });
 
       if (!res.ok) {
         const raw = await res.text();
@@ -118,8 +110,7 @@ export default function JobFit() {
     setStatus("Building an optimized resume tailored to this job…");
 
     try {
-      // ✅ Updated to expected optimize route
-      const res = await fetch(`${API_BASE_URL}/resume/optimize-from-jd`, {
+      const res = await fetch(`${API_BASE_URL}/job-fit/optimize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ job_description, resume_text }),
@@ -204,12 +195,14 @@ export default function JobFit() {
     setJobDesc("");
     setResumeContent("");
     setStatus(null);
+    setActiveJDTab("paste");
+    setActiveResumeTab("paste");
   }
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <main className="flex-1">
-        {/* HERO */}
+        {/* HERO – LIKE REFERENCE */}
         <section className="px-4 sm:px-6 lg:px-8 py-20 sm:py-32 bg-gradient-to-br from-orange-50 via-white to-pink-50">
           <div className="mx-auto max-w-5xl">
             <div className="text-center">
@@ -251,11 +244,11 @@ export default function JobFit() {
           </div>
         </section>
 
-        {/* MAIN CONTENT */}
+        {/* MAIN CONTENT – STEP 1 + ANALYSIS + OPTIMIZED RESUME */}
         <section className="px-4 sm:px-6 lg:px-8 py-20">
           <div className="mx-auto max-w-6xl">
             {!analysis ? (
-              /* STEP 1: INPUT PHASE */
+              /* STEP 1: INPUT PHASE (JD + RESUME TABS) */
               <div className="space-y-8">
                 <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
                   Step 1: Upload Your Job Description &amp; Resume
@@ -320,7 +313,7 @@ export default function JobFit() {
                     )}
                   </div>
 
-                  {/* RESUME CARD */}
+                  {/* RESUME CARD WITH TABS (PASTE / UPLOAD / SAVED) */}
                   <div className="p-8 rounded-2xl bg-gradient-to-br from-pink-50 to-white border-2 border-pink-200 hover:shadow-lg transition-shadow flex flex-col">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-600 to-pink-700 flex items-center justify-center">
@@ -382,24 +375,36 @@ export default function JobFit() {
 
                     {activeResumeTab === "saved" && (
                       <div className="space-y-3 flex-1">
-                        {savedResumes.map((resume) => (
-                          <button
-                            key={resume.id}
-                            onClick={() =>
-                              setResumeContent(`[Using: ${resume.name}]`)
-                            }
-                            className={`w-full flex items-center gap-3 p-4 text-left border-2 rounded-xl transition-all ${
-                              resumeContent.includes(resume.name)
-                                ? "border-pink-300 bg-pink-50"
-                                : "border-gray-200 bg-white hover:border-pink-200"
-                            }`}
-                          >
-                            <FileText className="h-5 w-5 text-pink-600 flex-shrink-0" />
-                            <span className="font-medium text-gray-900">
-                              {resume.name}
-                            </span>
-                          </button>
-                        ))}
+                        {savedResumes.length === 0 ? (
+                          <div className="p-6 rounded-xl border-2 border-dashed border-pink-200 bg-white text-center">
+                            <p className="text-sm text-gray-700 font-medium mb-1">
+                              No saved resumes yet
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Save a resume on the Enhance Resume page to use it
+                              here, or paste/upload your resume above.
+                            </p>
+                          </div>
+                        ) : (
+                          savedResumes.map((resume) => (
+                            <button
+                              key={resume.id}
+                              onClick={() =>
+                                setResumeContent(`[Using: ${resume.name}]`)
+                              }
+                              className={`w-full flex items-center gap-3 p-4 text-left border-2 rounded-xl transition-all ${
+                                resumeContent.includes(resume.name)
+                                  ? "border-pink-300 bg-pink-50"
+                                  : "border-gray-200 bg-white hover:border-pink-200"
+                              }`}
+                            >
+                              <FileText className="h-5 w-5 text-pink-600 flex-shrink-0" />
+                              <span className="font-medium text-gray-900">
+                                {resume.name}
+                              </span>
+                            </button>
+                          ))
+                        )}
                       </div>
                     )}
                   </div>
@@ -587,7 +592,7 @@ export default function JobFit() {
                   </ul>
                 </div>
 
-                {/* STEP 3: GET OPTIMIZED RESUME */}
+                {/* ACTION BUTTONS – STEP 3 GET OPTIMIZED RESUME */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {!optimizedResume && (
                     <button
