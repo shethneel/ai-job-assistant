@@ -42,7 +42,7 @@ export default function JobFit() {
 
   const [copied, setCopied] = useState(false);
 
-  // Just demo data for Saved Resume tab – no backend required
+  // Demo data for Saved Resume tab – visual only (no backend dependency)
   const savedResumes = [
     { id: 1, name: "Data Science Resume" },
     { id: 2, name: "Software Engineer Resume" },
@@ -62,11 +62,15 @@ export default function JobFit() {
     setStatus("Analyzing how well your resume fits this job…");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/job-fit/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_description, resume_text }),
-      });
+      // ✅ Updated to match backend route
+      const res = await fetch(
+        `${API_BASE_URL}/job-fit/match/analyze-from-jd`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_description, resume_text }),
+        }
+      );
 
       if (!res.ok) {
         const raw = await res.text();
@@ -77,17 +81,12 @@ export default function JobFit() {
       const data = await res.json();
 
       const normalized: Analysis = {
-        matchScore:
-          data.matchScore ??
-          data.match_score ??
-          data.score ??
-          0,
+        matchScore: data.matchScore ?? data.match_score ?? data.score ?? 0,
         strengths: data.strengths ?? data.strengths_list ?? [],
         missingSkills:
           data.missingSkills ?? data.missing_skills ?? data.gaps ?? [],
         redFlags: data.redFlags ?? data.red_flags ?? [],
-        recommendations:
-          data.recommendations ?? data.suggestions ?? [],
+        recommendations: data.recommendations ?? data.suggestions ?? [],
       };
 
       setAnalysis(normalized);
@@ -119,7 +118,8 @@ export default function JobFit() {
     setStatus("Building an optimized resume tailored to this job…");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/job-fit/optimize`, {
+      // ✅ Updated to expected optimize route
+      const res = await fetch(`${API_BASE_URL}/resume/optimize-from-jd`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ job_description, resume_text }),
@@ -208,9 +208,8 @@ export default function JobFit() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
-
       <main className="flex-1">
-        {/* HERO – EXACTLY LIKE REFERENCE */}
+        {/* HERO */}
         <section className="px-4 sm:px-6 lg:px-8 py-20 sm:py-32 bg-gradient-to-br from-orange-50 via-white to-pink-50">
           <div className="mx-auto max-w-5xl">
             <div className="text-center">
@@ -252,11 +251,11 @@ export default function JobFit() {
           </div>
         </section>
 
-        {/* MAIN CONTENT – STEP 1 + ANALYSIS + OPTIMIZED RESUME */}
+        {/* MAIN CONTENT */}
         <section className="px-4 sm:px-6 lg:px-8 py-20">
           <div className="mx-auto max-w-6xl">
             {!analysis ? (
-              /* STEP 1: INPUT PHASE (JD + RESUME TABS) */
+              /* STEP 1: INPUT PHASE */
               <div className="space-y-8">
                 <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
                   Step 1: Upload Your Job Description &amp; Resume
@@ -321,7 +320,7 @@ export default function JobFit() {
                     )}
                   </div>
 
-                  {/* RESUME CARD WITH TABS (PASTE / UPLOAD / SAVED) */}
+                  {/* RESUME CARD */}
                   <div className="p-8 rounded-2xl bg-gradient-to-br from-pink-50 to-white border-2 border-pink-200 hover:shadow-lg transition-shadow flex flex-col">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-600 to-pink-700 flex items-center justify-center">
@@ -588,7 +587,7 @@ export default function JobFit() {
                   </ul>
                 </div>
 
-                {/* ACTION BUTTONS – STEP 3 GET OPTIMIZED RESUME */}
+                {/* STEP 3: GET OPTIMIZED RESUME */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {!optimizedResume && (
                     <button
@@ -686,7 +685,6 @@ export default function JobFit() {
           </div>
         </section>
       </main>
-
     </div>
   );
 }
