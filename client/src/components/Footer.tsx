@@ -110,7 +110,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-600">
-            © 2024 CareerBoost. All rights reserved. Built with ❤️ for job seekers.
+            © 2025 CareerBoost. All rights reserved. Built with ❤️ for job seekers.
           </p>
           <div className="flex gap-6">
             <a href="#" className="text-gray-600 hover:text-blue-600 text-sm">
