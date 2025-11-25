@@ -2,13 +2,20 @@ import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-gray-200 bg-gray-50">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4 mb-8">
+    <footer className="bg-gray-50 border-t">
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
+          {/* Brand + description */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">
-              Features
-            </h3>
+            <h2 className="text-xl font-bold text-blue-600 mb-3">CareerBoost</h2>
+            <p className="text-gray-600 text-sm">
+              Land your dream job with AI-powered resume enhancement and career tools.
+            </p>
+          </div>
+
+          {/* Features */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Features</h3>
             <ul className="space-y-2">
               <li>
                 <Link
@@ -34,90 +41,85 @@ export default function Footer() {
                   Job Fit Analysis
                 </Link>
               </li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">
-              Product
-            </h3>
-            <ul className="space-y-2">
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/pricing"
                   className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   Pricing
-                </a>
+                </Link>
               </li>
+            </ul>
+          </div>
+
+          {/* Resources */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Resources</h3>
+            <ul className="space-y-2">
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/documentation"
                   className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   Documentation
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">
-              Company
-            </h3>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="#"
-                  className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
-                >
-                  About
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/blog"
                   className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   Blog
-                </a>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/about"
+                  className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                >
+                  About Us
+                </Link>
               </li>
             </ul>
           </div>
+
+          {/* Legal */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">
-              Legal
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Legal</h3>
             <ul className="space-y-2">
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/privacy"
                   className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
                 >
-                  Privacy
-                </a>
+                  Privacy Policy
+                </Link>
               </li>
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/terms"
                   className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
                 >
-                  Terms
-                </a>
+                  Terms of Service
+                </Link>
               </li>
             </ul>
           </div>
         </div>
-        <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row items-center justify-between">
+
+        {/* Bottom bar */}
+        <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-600">
-            © 2024 CareerBoost. All rights reserved.
+            © 2024 CareerBoost. All rights reserved. Built with ❤️ for job seekers.
           </p>
-          <div className="flex gap-6 mt-4 md:mt-0">
-            <a href="#" className="text-gray-600 hover:text-blue-600">
+          <div className="flex gap-6">
+            <a href="#" className="text-gray-600 hover:text-blue-600 text-sm">
               Twitter
             </a>
-            <a href="#" className="text-gray-600 hover:text-blue-600">
+            <a href="#" className="text-gray-600 hover:text-blue-600 text-sm">
               LinkedIn
             </a>
-            <a href="#" className="text-gray-600 hover:text-blue-600">
+            <a href="#" className="text-gray-600 hover:text-blue-600 text-sm">
               GitHub
             </a>
           </div>

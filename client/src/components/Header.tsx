@@ -69,11 +69,12 @@ export default function Header() {
 
   return (
     <>
+      {/* Top navbar */}
       <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur">
         <div className="max-w-7xl mx-auto flex items-center justify-between py-4 px-6">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-md shadow-blue-400/40">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 shadow-md shadow-blue-400/40">
               <BriefcaseBusiness className="h-5 w-5 text-white" strokeWidth={2.2} />
             </div>
             <span className="text-xl font-bold text-gray-900">CareerBoost</span>
@@ -95,7 +96,7 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* Right side */}
+          {/* Right side: auth / account */}
           <div className="flex items-center gap-3">
             {/* Logged OUT → Login + Sign up buttons */}
             {!userEmail && (
@@ -131,7 +132,7 @@ export default function Header() {
                   className="flex items-center gap-2 px-3 py-1.5 rounded-full border bg-white text-sm shadow-sm hover:bg-gray-50"
                   type="button"
                 >
-                  <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 text-white flex items-center justify-center text-sm font-semibold">
                     {getInitial(userEmail)}
                   </div>
                   <span className="font-medium text-gray-800">Account</span>

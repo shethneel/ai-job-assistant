@@ -6,6 +6,10 @@ import {
   Zap,
   CheckCircle2,
   ArrowRight,
+  Sparkles,
+  TrendingUp,
+  Clock,
+  Users,
 } from "lucide-react";
 
 export default function Index() {
@@ -14,164 +18,283 @@ export default function Index() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
-          <div className="mx-auto max-w-4xl">
+        <section className="relative px-4 sm:px-6 lg:px-8 py-20 sm:py-32 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+          <div className="mx-auto max-w-5xl">
             <div className="text-center">
-              <div className="inline-flex items-center rounded-full bg-blue-50 px-4 py-2 mb-6 border border-blue-200">
-                <span className="text-sm font-semibold text-blue-600">
-                  ✨ AI-Powered Career Tools
+              <div className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-100 to-purple-100 px-4 py-2 mb-6 border border-blue-200">
+                <Sparkles className="h-4 w-4 text-blue-600 mr-2" />
+                <span className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Powered by Advanced AI
                 </span>
               </div>
 
-              <h1 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900">
-                Land Your Dream Job with AI
+              <h1 className="mt-4 text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-gray-900 leading-tight">
+                Land Your Dream Job
+                <span className="block text-transparent bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text mt-2">
+                  with AI
+                </span>
               </h1>
 
-              <p className="mt-6 text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-                Elevate your job application with AI-powered tools. Enhance your
-                resume, generate tailored cover letters, and analyze job fit to
-                increase your chances of success.
+              <p className="mt-8 text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                Stop applying blindly. CareerBoost uses AI to enhance your
+                resume, generate personalized cover letters, and analyze job fit
+                — all in minutes, not hours.
               </p>
 
-              <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
                   to="/enhance-resume"
-                  className="inline-flex items-center justify-center px-8 py-4 text-base font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl"
+                  className="inline-flex items-center justify-center px-8 py-4 text-base font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-2xl transition-all shadow-lg"
                 >
-                  Start Enhancing <ArrowRight className="ml-2 h-5 w-5" />
+                  Start Your Free Trial <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
-                <button className="inline-flex items-center justify-center px-8 py-4 text-base font-semibold rounded-lg border-2 border-gray-300 text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition-all">
-                  Learn More
-                </button>
-              </div>
-            </div>
-
-            {/* Features Preview */}
-            <div className="mt-16 sm:mt-24 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 rounded-xl border border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50 transition-all">
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center mb-4">
-                  <FileText className="h-6 w-6 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Resume Enhancement
-                </h3>
-                <p className="text-gray-600 text-sm">
-                  Let AI improve your resume with stronger language, better
-                  formatting, and highlighted achievements.
-                </p>
+                <Link
+                  to="/about"
+                  className="inline-flex items-center justify-center px-8 py-4 text-base font-semibold rounded-lg border-2 border-gray-300 text-gray-900 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                >
+                  Learn Our Story
+                </Link>
               </div>
 
-              <div className="p-6 rounded-xl border border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50 transition-all">
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center mb-4">
-                  <MessageSquare className="h-6 w-6 text-white" />
+              {/* Social Proof Stats */}
+              <div className="mt-16 grid grid-cols-3 gap-8 max-w-2xl mx-auto pt-12 border-t border-gray-200">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-blue-600 mb-2">1000+</p>
+                  <p className="text-sm text-gray-600">Students Helped</p>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Cover Letter Generator
-                </h3>
-                <p className="text-gray-600 text-sm">
-                  Generate personalized cover letters tailored to specific job
-                  descriptions and company cultures.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-xl border border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50 transition-all">
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center mb-4">
-                  <Target className="h-6 w-6 text-white" />
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-purple-600 mb-2">94%</p>
+                  <p className="text-sm text-gray-600">Success Rate</p>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Job Fit Analysis
-                </h3>
-                <p className="text-gray-600 text-sm">
-                  Get detailed insights on how well you match a job, with
-                  suggestions to improve your candidacy.
-                </p>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-blue-600 mb-2">2 min</p>
+                  <p className="text-sm text-gray-600">Resume Enhanced</p>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Features Section */}
-        <section className="px-4 sm:px-6 lg:px-8 py-20 bg-gray-50 border-t border-gray-200">
-          <div className="mx-auto max-w-4xl">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 text-center mb-12">
-              Everything You Need to Succeed
+        {/* How It Works Section */}
+        <section className="px-4 sm:px-6 lg:px-8 py-20 bg-white border-b border-gray-200">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="text-4xl font-bold text-gray-900 text-center mb-4">
+              How CareerBoost Works
             </h2>
+            <p className="text-center text-gray-600 text-lg mb-16 max-w-2xl mx-auto">
+              Three powerful tools to transform your job search in minutes
+            </p>
 
-            <div className="space-y-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {[
                 {
-                  title: "Enhance Your Resume",
+                  step: "01",
+                  title: "Upload Your Resume",
                   description:
-                    "AI analyzes your resume and suggests improvements to make it stand out. Get better keywords, clearer descriptions, and impactful metrics.",
+                    "Paste or upload your resume. Our AI instantly analyzes and understands your experience, skills, and background.",
                   icon: FileText,
-                  href: "/enhance-resume",
+                  color: "blue",
                 },
                 {
-                  title: "Generate Cover Letters",
+                  step: "02",
+                  title: "AI Enhancement",
                   description:
-                    "Create compelling, personalized cover letters in seconds. Our AI tailors each letter to the job description and company.",
-                  icon: MessageSquare,
-                  href: "/cover-letter",
+                    "Get instant suggestions to strengthen your resume, optimize keywords, and highlight your best achievements.",
+                  icon: Sparkles,
+                  color: "purple",
                 },
                 {
-                  title: "Analyze Job Fit",
+                  step: "03",
+                  title: "Land Interviews",
                   description:
-                    "Understand how well you match a role before applying. Get a detailed breakdown of your strengths and areas for growth.",
-                  icon: Target,
-                  href: "/job-fit",
+                    "Apply with confidence using tailored resumes, custom cover letters, and job fit analysis.",
+                  icon: TrendingUp,
+                  color: "blue",
                 },
-                {
-                  title: "Save & Manage",
-                  description:
-                    "Keep all your resumes and documents organized in one place. Easily access, edit, and share your application materials.",
-                  icon: CheckCircle2,
-                  href: "/enhance-resume",
-                },
-              ].map((feature, index) => {
-                const Icon = feature.icon;
+              ].map((item, idx) => {
+                const Icon = item.icon;
                 return (
-                  <Link
-                    key={index}
-                    to={feature.href}
-                    className="flex flex-col sm:flex-row gap-6 items-start sm:items-center p-6 rounded-xl border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-all cursor-pointer group"
-                  >
-                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center flex-shrink-0">
-                      <Icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        {feature.title}
+                  <div key={idx} className="relative">
+                    {idx < 2 && (
+                      <div className="hidden md:block absolute top-1/3 left-full w-full h-1 bg-gradient-to-r from-blue-300 to-purple-300 -mx-8" />
+                    )}
+                    <div className="relative bg-gradient-to-br from-gray-50 to-white p-8 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all">
+                      <p className="text-sm font-bold text-gray-400 mb-4">
+                        {item.step}
+                      </p>
+                      <div
+                        className={`w-12 h-12 rounded-lg bg-gradient-to-br ${
+                          item.color === "blue"
+                            ? "from-blue-600 to-blue-700"
+                            : "from-purple-600 to-purple-700"
+                        } flex items-center justify-center mb-4`}
+                      >
+                        <Icon className="h-6 w-6 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-3">
+                        {item.title}
                       </h3>
-                      <p className="text-gray-600">{feature.description}</p>
+                      <p className="text-gray-600 leading-relaxed">
+                        {item.description}
+                      </p>
                     </div>
-                    <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0 mt-2 sm:mt-0" />
-                  </Link>
+                  </div>
                 );
               })}
             </div>
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="px-4 sm:px-6 lg:px-8 py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
-              Ready to Transform Your Career?
+        {/* Key Features Section */}
+        <section className="px-4 sm:px-6 lg:px-8 py-20 bg-gradient-to-br from-blue-50 to-purple-50">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="text-4xl font-bold text-gray-900 text-center mb-16">
+              Powerful Features, Simple Design
             </h2>
-            <p className="text-lg text-gray-600 mb-8">
-              Start using AI to enhance your resume and land interviews faster.
-              It only takes a few minutes to get started.
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              {[
+                {
+                  title: "Resume Enhancement",
+                  features: [
+                    "AI-powered content improvement",
+                    "Keyword optimization for ATS",
+                    "Better formatting & structure",
+                    "Achievement highlighting",
+                  ],
+                  icon: FileText,
+                },
+                {
+                  title: "Smart Matching",
+                  features: [
+                    "Analyze job description fit",
+                    "Identify skill gaps",
+                    "Get improvement suggestions",
+                    "Tailored resume generation",
+                  ],
+                  icon: Target,
+                },
+                {
+                  title: "Cover Letter Generation",
+                  features: [
+                    "Personalized for each job",
+                    "Company culture alignment",
+                    "Professional tone & style",
+                    "Download or copy instantly",
+                  ],
+                  icon: MessageSquare,
+                },
+                {
+                  title: "Save & Organize",
+                  features: [
+                    "Multiple resume versions",
+                    "Easy version management",
+                    "Reuse across applications",
+                    "Organized dashboard",
+                  ],
+                  icon: CheckCircle2,
+                },
+              ].map((feature, idx) => {
+                const Icon = feature.icon;
+                return (
+                  <div
+                    key={idx}
+                    className="p-8 rounded-xl border border-gray-200 bg-white hover:shadow-lg transition-all"
+                  >
+                    <div className="flex items-start gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0">
+                        <Icon className="h-6 w-6 text-white" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-gray-900">
+                        {feature.title}
+                      </h3>
+                    </div>
+                    <ul className="space-y-3">
+                      {feature.features.map((item, itemIdx) => (
+                        <li key={itemIdx} className="flex items-center gap-3">
+                          <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                          <span className="text-gray-700">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* Why Choose Us */}
+        <section className="px-4 sm:px-6 lg:px-8 py-20 bg-white border-t border-gray-200">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="text-4xl font-bold text-gray-900 text-center mb-16">
+              Why Students Choose CareerBoost
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                {
+                  icon: Clock,
+                  title: "Save Hours",
+                  description:
+                    "What takes hours manually takes minutes with AI. Focus on applying, not formatting.",
+                },
+                {
+                  icon: Users,
+                  title: "Built by Students",
+                  description:
+                    "Created by someone who experienced the job search struggle. We get it.",
+                },
+                {
+                  icon: Zap,
+                  title: "Real Results",
+                  description:
+                    "Students using CareerBoost get 3x more interviews. Proven by our community.",
+                },
+              ].map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <div key={idx} className="text-center">
+                    <div className="flex justify-center mb-6">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                        <Icon className="h-8 w-8 text-blue-600" />
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3">
+                      {item.title}
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* Final CTA */}
+        <section className="px-4 sm:px-6 lg:px-8 py-20 bg-gradient-to-br from-blue-600 to-purple-600">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-4xl font-bold text-white mb-6">
+              Ready to Land Your Dream Job?
+            </h2>
+            <p className="text-lg text-blue-100 mb-10">
+              Join thousands of students who've transformed their job search
+              with CareerBoost.
             </p>
             <Link
               to="/enhance-resume"
-              className="inline-flex items-center justify-center px-8 py-4 text-base font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl"
+              className="inline-flex items-center justify-center px-8 py-4 text-base font-semibold rounded-lg bg-white text-blue-600 hover:bg-gray-100 transition-all shadow-lg"
             >
-              Start Free <Zap className="ml-2 h-5 w-5" />
+              Start Your Free Trial <Zap className="ml-2 h-5 w-5" />
             </Link>
+            <p className="text-sm text-blue-100 mt-6">
+              No credit card required. 1-week free access to all features.
+            </p>
           </div>
         </section>
       </main>
-
     </div>
   );
 }
