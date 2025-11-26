@@ -69,10 +69,12 @@ def clean_json_output(raw: str) -> str:
 
         return _re.sub(pattern, _repl, source, flags=_re.DOTALL)
 
+    # Fix triple-quoted fields if the model used them
     text = _replace_triple_quoted("tailored_resume", text)
     text = _replace_triple_quoted("improvement_explanation", text)
 
     return text
+
 
 
 class TailorFromSavedRequest(BaseModel):
