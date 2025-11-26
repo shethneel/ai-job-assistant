@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BriefcaseBusiness, ChevronDown } from "lucide-react";
+import { BriefcaseBusiness, ChevronDown, FileText } from "lucide-react";
 import AuthModal from "./AuthModal";
 
 type AuthMode = "login" | "signup";
@@ -145,19 +145,26 @@ export default function Header() {
                       className="w-full text-left px-4 py-2 hover:bg-gray-50"
                       type="button"
                     >
-                      Profile
+                      Dashboard
                     </button>
+
+                    <button
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate("/my-resumes");
+                      }}
+                    >
+                      <FileText className="w-4 h-4 text-gray-500" />
+                      <span>My Resumes</span>
+                    </button>
+
                     <button
                       className="w-full text-left px-4 py-2 hover:bg-gray-50"
                       type="button"
                     >
                       Settings
-                    </button>
-                    <button
-                      className="w-full text-left px-4 py-2 hover:bg-gray-50"
-                      type="button"
-                    >
-                      Change password
                     </button>
 
                     <div className="my-1 border-t" />
