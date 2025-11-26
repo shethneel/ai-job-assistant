@@ -1,6 +1,6 @@
 // src/pages/EnhanceResume.tsx
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   Upload,
   Wand2,
@@ -14,68 +14,31 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+// For dev you can set VITE_API_BASE_URL=http://127.0.0.1:8000
+// In production, leave it empty so it hits the same origin.
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE_URL || "";
+
 export default function EnhanceResume() {
   const [resumeText, setResumeText] = useState("");
-  const [enhancedResume, setEnhancedResume] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const [enhancedVersions, setEnhancedVersions] = useState<string[]>([]);
+  const [selectedVersionIndex, setSelectedVersionIndex] = useState(0);
+
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [savedResumes, setSavedResumes] = useState<
     { id: string; name: string; content: string }[]
   >([]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleEnhance = async () => {
-    if (!resumeText.trim()) {
-      alert("Please enter your resume content");
-      return;
-    }
+  const currentEnhanced =
+    enhancedVersions[selectedVersionIndex] || "";
 
-    setIsEnhancing(true);
-    setEnhancedResume("BE PATIENT, GOOD THINGS TAKES TIME ✨");
-
-    // Fake enhancement – replace with your API call if needed
-    setTimeout(() => {
-      const enhanced = `✨ ENHANCED RESUME ✨
-
-${resumeText}
-
-[AI Enhancement Summary]
-- Added industry-specific keywords
-- Improved bullet point clarity
-- Enhanced action verbs
-- Quantified achievements where possible
-- Optimized formatting for ATS systems`;
-
-      setEnhancedResume(enhanced);
-      setIsEnhancing(false);
-    }, 2000);
-  };
-
-  const handleSaveResume = () => {
-    if (!enhancedResume) {
-      alert("Please enhance your resume first");
-      return;
-    }
-
-    const newResume = {
-      id: Date.now().toString(),
-      name: `Resume ${new Date().toLocaleDateString()}`,
-      content: enhancedResume,
-    };
-
-    setSavedResumes((prev) => [...prev, newResume]);
-    alert("Resume saved successfully!");
-  };
-
-  const handleDownload = (content: string) => {
-    const element = document.createElement("a");
-    const file = new Blob([content], { type: "text/plain" });
-    element.href = URL.createObjectURL(file);
-    element.download = `enhanced-resume-${Date.now()}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
+  const hasInput = resumeText.trim().length > 0 || !!selectedFile;
 
   const handleClickUpload = () => {
     fileInputRef.current?.click();
@@ -85,6 +48,9 @@ ${resumeText}
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setSelectedFile(file);
+
+    // Optional: try to show text preview (works nicely for .txt/.docx)
     const reader = new FileReader();
     reader.onload = () => {
       const text = reader.result?.toString() || "";
@@ -93,9 +59,107 @@ ${resumeText}
     reader.readAsText(file);
   };
 
+  const buildFormData = (): FormData => {
+    const formData = new FormData();
+
+    if (selectedFile) {
+      // If user uploaded a file, send it directly
+      formData.append("file", selectedFile);
+    } else {
+      // Otherwise, convert pasted text into a temporary file
+      const trimmed = resumeText.trim();
+      if (!trimmed) {
+        throw new Error("Please paste your resume or upload a file first.");
+      }
+      const blob = new Blob([trimmed], { type: "text/plain" });
+      const fakeFile = new File([blob], "pasted-resume.txt", {
+        type: "text/plain",
+      });
+      formData.append("file", fakeFile);
+    }
+
+    return formData;
+  };
+
+  const handleEnhance = async () => {
+    if (!hasInput) {
+      alert("Please paste your resume or upload a file first");
+      return;
+    }
+
+    setIsEnhancing(true);
+    setErrorMessage(null);
+    setEnhancedVersions([]);
+    setSelectedVersionIndex(0);
+
+    try {
+      const formData = buildFormData();
+
+      const response = await fetch(`${API_BASE}/resume/improve`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(
+          data?.detail ||
+            "Failed to enhance resume. Please try again."
+        );
+      }
+
+      const data = await response.json();
+      const versions: string[] = Array.isArray(data.versions)
+        ? data.versions
+        : [];
+
+      if (!versions.length) {
+        throw new Error(
+          "API did not return any enhanced versions. Please try again."
+        );
+      }
+
+      setEnhancedVersions(versions);
+      setSelectedVersionIndex(0);
+    } catch (err: any) {
+      console.error("Enhance error:", err);
+      setErrorMessage(err?.message || "Failed to enhance resume.");
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  const handleSaveResume = () => {
+    if (!currentEnhanced) {
+      alert("Please enhance your resume first");
+      return;
+    }
+
+    const newResume = {
+      id: Date.now().toString(),
+      name: `Resume ${new Date().toLocaleDateString()} (v${
+        selectedVersionIndex + 1
+      })`,
+      content: currentEnhanced,
+    };
+
+    setSavedResumes((prev) => [...prev, newResume]);
+    alert("Resume saved successfully!");
+  };
+
+  const handleDownload = (content: string) => {
+    if (!content) return;
+    const element = document.createElement("a");
+    const file = new Blob([content], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = `enhanced-resume-${Date.now()}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
-
       <main className="flex-1">
         {/* HERO SECTION */}
         <section className="px-4 sm:px-6 lg:px-8 py-20 sm:py-32 bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -126,15 +190,23 @@ ${resumeText}
               {/* Quick Stats */}
               <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
                 <div className="p-4 rounded-lg bg-white border border-blue-200 hover:shadow-md transition-shadow">
-                  <p className="text-2xl font-bold text-blue-600">40 Seconds</p>
-                  <p className="text-xs text-gray-600 mt-1">Time to enhance</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    40 Seconds
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Time to enhance
+                  </p>
                 </div>
                 <div className="p-4 rounded-lg bg-white border border-purple-200 hover:shadow-md transition-shadow">
-                  <p className="text-2xl font-bold text-purple-600">+40%</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    +40%
+                  </p>
                   <p className="text-xs text-gray-600 mt-1">Keyword boost</p>
                 </div>
                 <div className="p-4 rounded-lg bg-white border border-blue-200 hover:shadow-md transition-shadow">
-                  <p className="text-2xl font-bold text-blue-600">100%</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    100%
+                  </p>
                   <p className="text-xs text-gray-600 mt-1">ATS ready</p>
                 </div>
               </div>
@@ -158,7 +230,7 @@ ${resumeText}
                       Your Original Resume
                     </h3>
                     <p className="text-sm text-gray-600">
-                      Paste your content below
+                      Paste your content or upload a file
                     </p>
                   </div>
                 </div>
@@ -180,7 +252,7 @@ ${resumeText}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={handleEnhance}
-                    disabled={isEnhancing || !resumeText.trim()}
+                    disabled={isEnhancing || !hasInput}
                     className="flex-1 inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     <Wand2 className="h-5 w-5 mr-2" />
@@ -204,6 +276,12 @@ ${resumeText}
                     className="hidden"
                   />
                 </div>
+
+                {errorMessage && (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    {errorMessage}
+                  </div>
+                )}
               </div>
 
               {/* OUTPUT CARD */}
@@ -212,32 +290,51 @@ ${resumeText}
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center">
                     <Sparkles className="h-6 w-6 text-white" />
                   </div>
-                <div>
+                  <div>
                     <h3 className="text-lg font-bold text-gray-900">
                       Enhanced Resume
                     </h3>
                     <p className="text-sm text-gray-600">
-                      AI-powered improvements
+                      AI-powered improvements (multiple versions)
                     </p>
                   </div>
                 </div>
 
+                {enhancedVersions.length > 0 && (
+                  <div className="flex gap-2 mb-3">
+                    {enhancedVersions.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedVersionIndex(idx)}
+                        className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                          selectedVersionIndex === idx
+                            ? "border-purple-600 bg-purple-50 text-purple-700"
+                            : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        Version {idx + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <textarea
-                  value={enhancedResume}
+                  value={currentEnhanced}
                   readOnly
                   placeholder="Your enhanced resume will appear here with improvements highlighted..."
                   className="w-full px-4 py-3 mb-6 border-2 border-purple-200 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none h-64"
                 />
 
-                {enhancedResume && (
+                {enhancedVersions.length > 0 && (
                   <div className="p-4 rounded-lg bg-green-100 border border-green-200 mb-6">
                     <p className="text-sm text-green-900">
-                      ✓ Resume enhanced and ready to use.
+                      ✓ Resume enhanced and ready to use. You can switch
+                      between different versions above.
                     </p>
                   </div>
                 )}
 
-                {enhancedResume && (
+                {enhancedVersions.length > 0 && (
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={handleSaveResume}
@@ -247,7 +344,7 @@ ${resumeText}
                       Save Resume
                     </button>
                     <button
-                      onClick={() => handleDownload(enhancedResume)}
+                      onClick={() => handleDownload(currentEnhanced)}
                       className="flex-1 inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-xl border-2 border-gray-300 text-gray-900 hover:border-blue-400 hover:bg-blue-50 transition-all"
                     >
                       <Download className="h-5 w-5 mr-2" />
@@ -358,7 +455,6 @@ ${resumeText}
           </div>
         </section>
       </main>
-
     </div>
   );
 }

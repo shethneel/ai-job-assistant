@@ -1,6 +1,6 @@
 // src/pages/JobFit.tsx
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Target,
   Upload,
@@ -15,247 +15,529 @@ import {
   Zap,
 } from "lucide-react";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+type ActiveJDTab = "paste" | "upload";
+type ActiveResumeTab = "paste" | "upload" | "saved";
 
-type Analysis = {
+interface Analysis {
   matchScore: number;
   strengths: string[];
   missingSkills: string[];
   redFlags: string[];
   recommendations: string[];
-};
+}
+
+// Use same-origin by default; in dev you can set VITE_API_BASE_URL=http://127.0.0.1:8000
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE_URL || "";
+
+// Keys we *expect* might be used for our JWT in localStorage
+const PREFERRED_TOKEN_KEYS = [
+  "jobAgentToken",
+  "access_token",
+  "accessToken",
+  "token",
+  "authToken",
+  "careerboost_token",
+];
 
 export default function JobFit() {
   const [jobDesc, setJobDesc] = useState("");
   const [resumeContent, setResumeContent] = useState("");
+  const [uploadedResumeFile, setUploadedResumeFile] =
+    useState<File | null>(null);
+  const [uploadedJDFileName, setUploadedJDFileName] =
+    useState<string>("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [optimizedResume, setOptimizedResume] = useState("");
+  const [enhancedResume, setEnhancedResume] = useState("");
+  const [improvementExplanation, setImprovementExplanation] =
+    useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-
-  const [activeJDTab, setActiveJDTab] = useState<"paste" | "upload">("paste");
-  const [activeResumeTab, setActiveResumeTab] = useState<
-    "paste" | "upload" | "saved"
-  >("paste");
-
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [activeJDTab, setActiveJDTab] =
+    useState<ActiveJDTab>("paste");
+  const [activeResumeTab, setActiveResumeTab] =
+    useState<ActiveResumeTab>("paste");
   const [copied, setCopied] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(
+    null
+  );
 
-  // No fake saved resumes. This will be wired to real backend data later.
-  const savedResumes: { id: string; name: string }[] = [];
+  const [token, setToken] = useState<string | null>(null);
+  const [hasSavedResume, setHasSavedResume] =
+    useState<boolean | null>(null);
+  const [checkingSavedResume, setCheckingSavedResume] =
+    useState(false);
 
-  async function handleAnalyzeResume() {
-    const job_description = jobDesc.trim();
-    const resume_text = resumeContent.trim();
+  // -------- AUTH TOKEN DETECTION --------
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-    if (!job_description || !resume_text) {
-      setStatus("Please add both the job description and your resume.");
+    const ls = window.localStorage;
+    let foundToken: string | null = null;
+    let foundKey: string | null = null;
+
+    // Pass 1: look at well-known keys only
+    for (const key of PREFERRED_TOKEN_KEYS) {
+      const value = ls.getItem(key);
+      if (value) {
+        foundToken = value;
+        foundKey = key;
+        break;
+      }
+    }
+
+    // Helper: JWT-ish check
+    const looksLikeJwt = (value: string) => {
+      const parts = value.split(".");
+      return parts.length === 3 && value.length > 20;
+    };
+
+    // Pass 2: any key *containing* "token" or "auth"
+    if (!foundToken) {
+      for (let i = 0; i < ls.length; i++) {
+        const key = ls.key(i);
+        if (!key) continue;
+        if (!/token|auth/i.test(key)) continue;
+
+        const value = ls.getItem(key);
+        if (!value) continue;
+        if (!looksLikeJwt(value.replace(/^Bearer\s+/i, ""))) continue;
+
+        foundToken = value;
+        foundKey = key;
+        break;
+      }
+    }
+
+    // Pass 3 (last resort): scan everything, but only JWT-ish values
+    if (!foundToken) {
+      for (let i = 0; i < ls.length; i++) {
+        const key = ls.key(i);
+        if (!key) continue;
+        const value = ls.getItem(key);
+        if (!value) continue;
+        if (!looksLikeJwt(value.replace(/^Bearer\s+/i, ""))) continue;
+        foundToken = value;
+        foundKey = key;
+        break;
+      }
+    }
+
+    console.log("JobFit: detected auth token", {
+      key: foundKey,
+      hasToken: !!foundToken,
+      preview: foundToken ? foundToken.slice(0, 15) + "..." : null,
+    });
+
+    setToken(foundToken || null);
+  }, []);
+
+  // Check if user already has a saved resume
+  useEffect(() => {
+    const checkSaved = async () => {
+      if (!token) {
+        setHasSavedResume(null);
+        return;
+      }
+      setCheckingSavedResume(true);
+      try {
+        // Normalize token in case it's stored as "Bearer xxxxx"
+        const cleaned = token.replace(/^Bearer\s+/i, "").trim();
+        const res = await fetch(`${API_BASE}/user/resume`, {
+          headers: {
+            Authorization: `Bearer ${cleaned}`,
+          },
+        });
+
+        if (res.status === 401) {
+          console.warn("JobFit: /user/resume returned 401");
+          setToken(null);
+          setHasSavedResume(null);
+          return;
+        }
+
+        if (res.ok) {
+          setHasSavedResume(true);
+        } else if (res.status === 404) {
+          setHasSavedResume(false);
+        } else {
+          setHasSavedResume(null);
+        }
+      } catch (e) {
+        console.error("Error checking saved resume:", e);
+        setHasSavedResume(null);
+      } finally {
+        setCheckingSavedResume(false);
+      }
+    };
+    checkSaved();
+  }, [token]);
+
+  const resetAll = () => {
+    setJobDesc("");
+    setResumeContent("");
+    setUploadedResumeFile(null);
+    setUploadedJDFileName("");
+    setAnalysis(null);
+    setEnhancedResume("");
+    setImprovementExplanation("");
+    setErrorMessage(null);
+    setActiveJDTab("paste");
+    setActiveResumeTab("paste");
+  };
+
+  // JD upload → read as text on client
+  const handleJDFileChange = (file: File | null) => {
+    if (!file) {
+      setUploadedJDFileName("");
+      setJobDesc("");
+      return;
+    }
+    setUploadedJDFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = (e.target?.result as string) || "";
+      setJobDesc(text);
+    };
+    reader.readAsText(file);
+  };
+
+  // Normalize + require a token
+  const requireToken = (): string => {
+    let raw = token;
+
+    // Tiny fallback in case state isn't populated yet
+    if (!raw && typeof window !== "undefined") {
+      const ls = window.localStorage;
+      for (const key of PREFERRED_TOKEN_KEYS) {
+        const v = ls.getItem(key);
+        if (v) {
+          raw = v;
+          break;
+        }
+      }
+    }
+
+    if (!raw) {
+      throw new Error(
+        "Please log in to use Job Fit and saved resume features."
+      );
+    }
+
+    const cleaned = raw.replace(/^Bearer\s+/i, "").trim();
+    if (!cleaned) {
+      throw new Error(
+        "Please log in to use Job Fit and saved resume features."
+      );
+    }
+    return cleaned;
+  };
+
+  // Upload current resume as the user's "saved resume"
+  const uploadCurrentResumeAsSaved = async (authToken: string) => {
+    const formData = new FormData();
+
+    if (activeResumeTab === "paste") {
+      if (!resumeContent.trim()) {
+        throw new Error("Please paste your resume first.");
+      }
+      const blob = new Blob([resumeContent], { type: "text/plain" });
+      const file = new File([blob], "pasted-resume.txt", {
+        type: "text/plain",
+      });
+      formData.append("file", file);
+    } else if (activeResumeTab === "upload") {
+      if (!uploadedResumeFile) {
+        throw new Error("Please upload a resume file first.");
+      }
+      formData.append("file", uploadedResumeFile);
+    } else {
+      // "saved" tab – assume it's already uploaded
       return;
     }
 
+    const res = await fetch(`${API_BASE}/user/resume/upload`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: formData,
+    });
+
+    if (res.status === 401) {
+      setToken(null);
+      throw new Error(
+        "Your session has expired. Please log in again to upload your resume."
+      );
+    }
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(
+        data?.detail || "Failed to upload resume. Please try again."
+      );
+    }
+
+    setHasSavedResume(true);
+  };
+
+  const handleAnalyzeResume = async () => {
+    setErrorMessage(null);
+    setAnalysis(null);
+    setEnhancedResume("");
+    setImprovementExplanation("");
     setIsAnalyzing(true);
-    setStatus("Analyzing how well your resume fits this job…");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/job-fit/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_description, resume_text }),
-      });
+      const jd = jobDesc.trim();
+      if (!jd) {
+        throw new Error("Please provide a job description.");
+      }
+
+      const authToken = requireToken(); // may throw
+
+      // Make sure backend has a "saved" resume to work with
+      if (activeResumeTab !== "saved") {
+        await uploadCurrentResumeAsSaved(authToken);
+      } else if (hasSavedResume === false) {
+        throw new Error(
+          "No saved resume found. Please paste or upload a resume first."
+        );
+      }
+
+      const res = await fetch(
+        `${API_BASE}/job-match/analyze-from-saved`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ job_description: jd }),
+        }
+      );
+
+      if (res.status === 401) {
+        setToken(null);
+        throw new Error(
+          "Your session has expired. Please log in again to analyze job fit."
+        );
+      }
+
+      if (res.status === 404) {
+        throw new Error(
+          "No saved resume found. Please upload or paste your resume first."
+        );
+      }
+
+      if (res.status === 429) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.detail || "Daily job match limit reached."
+        );
+      }
 
       if (!res.ok) {
-        const raw = await res.text();
-        console.error("Job fit error:", raw);
-        throw new Error("We couldn’t analyze your resume right now.");
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.detail ||
+            "Failed to analyze job match. Please try again."
+        );
       }
 
       const data = await res.json();
-
-      const normalized: Analysis = {
-        matchScore: data.matchScore ?? data.match_score ?? data.score ?? 0,
-        strengths: data.strengths ?? data.strengths_list ?? [],
-        missingSkills:
-          data.missingSkills ?? data.missing_skills ?? data.gaps ?? [],
-        redFlags: data.redFlags ?? data.red_flags ?? [],
-        recommendations: data.recommendations ?? data.suggestions ?? [],
+      const mapped: Analysis = {
+        matchScore: data.match_score ?? 0,
+        strengths: data.strong_points ?? [],
+        missingSkills: data.missing_skills ?? [],
+        redFlags: data.red_flags ?? [],
+        recommendations: data.recommendations ?? [],
       };
 
-      setAnalysis(normalized);
-      setStatus("Analysis ready — review your strengths, gaps, and next steps.");
+      setAnalysis(mapped);
     } catch (err: any) {
-      console.error(err);
-      setAnalysis(null);
-      setStatus(
-        err?.message ||
-          "Something went wrong while analyzing your resume fit."
-      );
+      console.error("Analyze error:", err);
+      setErrorMessage(err?.message || "Failed to analyze resume.");
     } finally {
       setIsAnalyzing(false);
     }
-  }
+  };
 
-  async function handleOptimizeResume() {
-    const job_description = jobDesc.trim();
-    const resume_text = resumeContent.trim();
-
-    if (!job_description || !resume_text) {
-      setStatus(
-        "Please make sure both job description and resume are filled before optimizing."
-      );
-      return;
-    }
-
-    setIsOptimizing(true);
-    setStatus("Building an optimized resume tailored to this job…");
+  const handleEnhanceResume = async () => {
+    setErrorMessage(null);
+    setIsEnhancing(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/job-fit/optimize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_description, resume_text }),
-      });
+      const jd = jobDesc.trim();
+      if (!jd) {
+        throw new Error("Please provide a job description first.");
+      }
+
+      const authToken = requireToken(); // may throw
+
+      if (!hasSavedResume) {
+        throw new Error(
+          "No saved resume found. Please upload or paste your resume and analyze first."
+        );
+      }
+
+      const res = await fetch(
+        `${API_BASE}/resume/tailor-from-saved`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ job_description: jd }),
+        }
+      );
+
+      if (res.status === 401) {
+        setToken(null);
+        throw new Error(
+          "Your session has expired. Please log in again to tailor your resume."
+        );
+      }
+
+      if (res.status === 404) {
+        throw new Error(
+          "No saved resume found. Please upload or paste your resume first."
+        );
+      }
+
+      if (res.status === 429) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.detail || "Daily tailoring limit reached."
+        );
+      }
 
       if (!res.ok) {
-        const raw = await res.text();
-        console.error("Optimize error:", raw);
+        const data = await res.json().catch(() => null);
         throw new Error(
-          "We couldn’t create an optimized resume right now. Please try again."
+          data?.detail ||
+            "Failed to generate tailored resume. Please try again."
         );
       }
 
       const data = await res.json();
+      const improved = data.improved_match;
 
-      const text =
-        data.optimized_resume ||
-        data.enhanced_resume ||
-        data.resume ||
-        data.text ||
-        "";
+      const mappedImproved: Analysis = {
+        matchScore: improved.match_score ?? 0,
+        strengths: improved.strong_points ?? [],
+        missingSkills: improved.missing_skills ?? [],
+        redFlags: improved.red_flags ?? [],
+        recommendations: improved.recommendations ?? [],
+      };
 
-      if (!text) {
-        setStatus(
-          "We got a response from the server, but it was empty. Please try again."
-        );
-      }
-
-      setOptimizedResume(
-        text ||
-          "We tried to optimize your resume, but the response came back empty."
+      setAnalysis(mappedImproved);
+      setEnhancedResume(data.tailored_resume || "");
+      setImprovementExplanation(
+        data.improvement_explanation || ""
       );
-      setStatus("Done! You can now copy or download your optimized resume.");
     } catch (err: any) {
-      console.error(err);
-      setOptimizedResume("");
-      setStatus(
-        err?.message ||
-          "Something went wrong while building your optimized resume."
-      );
+      console.error("Enhance error:", err);
+      setErrorMessage(err?.message || "Failed to enhance resume.");
     } finally {
-      setIsOptimizing(false);
+      setIsEnhancing(false);
     }
-  }
+  };
 
-  function handleCopyOptimized() {
-    if (!optimizedResume.trim()) return;
+  const handleCopyResume = () => {
+    if (!enhancedResume) return;
+    navigator.clipboard.writeText(enhancedResume);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-    navigator.clipboard
-      .writeText(optimizedResume)
-      .then(() => {
-        setCopied(true);
-        setStatus("Optimized resume copied — make any final tweaks you like.");
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {
-        setStatus(
-          "Couldn’t copy automatically. You can still copy it manually."
-        );
-      });
-  }
-
-  function handleDownloadOptimized() {
-    if (!optimizedResume.trim()) return;
-
-    const blob = new Blob([optimizedResume], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "optimized-resume.txt";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    setStatus("Downloaded your optimized resume as a .txt file.");
-  }
-
-  function resetAll() {
-    setAnalysis(null);
-    setOptimizedResume("");
-    setJobDesc("");
-    setResumeContent("");
-    setStatus(null);
-    setActiveJDTab("paste");
-    setActiveResumeTab("paste");
-  }
+  const handleDownloadResume = () => {
+    if (!enhancedResume) return;
+    const element = document.createElement("a");
+    const file = new Blob([enhancedResume], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = `optimized-resume-${Date.now()}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <main className="flex-1">
-        {/* HERO – LIKE REFERENCE */}
+        {/* Hero Section */}
         <section className="px-4 sm:px-6 lg:px-8 py-20 sm:py-32 bg-gradient-to-br from-orange-50 via-white to-pink-50">
           <div className="mx-auto max-w-5xl">
             <div className="text-center">
               <div className="inline-flex items-center rounded-full bg-gradient-to-r from-orange-100 to-pink-100 px-4 py-2 mb-8 border border-orange-200">
                 <Target className="h-4 w-4 text-orange-600 mr-2" />
                 <span className="text-sm font-semibold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
-                  Smart Optimization
+                  Job Fit & Tailored Resume
                 </span>
               </div>
 
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-gray-900 leading-tight mt-6 mb-6">
-                Resume Optimizer
+                Job Fit Analyzer
                 <span className="block text-transparent bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text mt-3">
-                  Match &amp; Enhance
+                  Match & Tailor Your Resume
                 </span>
               </h1>
 
               <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-10">
-                Analyze how well your resume matches any job description,
-                identify gaps, get personalized recommendations, and receive an
-                AI-enhanced resume tailored to the role.
+                Analyze how well your resume matches a job description using
+                your saved profile, then generate a tailored version that boosts
+                your match score while keeping your real experience.
               </p>
 
               <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
                 <div className="p-4 rounded-lg bg-white border border-orange-200 hover:shadow-md transition-shadow">
-                  <p className="text-2xl font-bold text-orange-600">360°</p>
-                  <p className="text-xs text-gray-600 mt-1">Full analysis</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    1x
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Save resume once
+                  </p>
                 </div>
                 <div className="p-4 rounded-lg bg-white border border-pink-200 hover:shadow-md transition-shadow">
-                  <p className="text-2xl font-bold text-pink-600">Instant</p>
-                  <p className="text-xs text-gray-600 mt-1">Results</p>
+                  <p className="text-2xl font-bold text-pink-600">
+                    Any
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Job description
+                  </p>
                 </div>
                 <div className="p-4 rounded-lg bg-white border border-orange-200 hover:shadow-md transition-shadow">
-                  <p className="text-2xl font-bold text-orange-600">AI</p>
-                  <p className="text-xs text-gray-600 mt-1">Enhancement</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    AI
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Match & Tailoring
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* MAIN CONTENT – STEP 1 + ANALYSIS + OPTIMIZED RESUME */}
+        {/* Main Content */}
         <section className="px-4 sm:px-6 lg:px-8 py-20">
           <div className="mx-auto max-w-6xl">
+            {errorMessage && (
+              <div className="mb-6 max-w-3xl mx-auto rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {errorMessage}
+              </div>
+            )}
+
             {!analysis ? (
-              /* STEP 1: INPUT PHASE (JD + RESUME TABS) */
+              // Step 1: Input Phase
               <div className="space-y-8">
                 <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-                  Step 1: Upload Your Job Description &amp; Resume
+                  Step 1: Add Job Description & Choose Resume Source
                 </h2>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* JOB DESCRIPTION CARD */}
+                  {/* Job Description Input */}
                   <div className="p-8 rounded-2xl bg-gradient-to-br from-orange-50 to-white border-2 border-orange-200 hover:shadow-lg transition-shadow">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-600 to-orange-700 flex items-center justify-center">
@@ -274,7 +556,7 @@ export default function JobFit() {
                         <button
                           key={tab.id}
                           onClick={() =>
-                            setActiveJDTab(tab.id as "paste" | "upload")
+                            setActiveJDTab(tab.id as ActiveJDTab)
                           }
                           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                             activeJDTab === tab.id
@@ -290,30 +572,43 @@ export default function JobFit() {
                     {activeJDTab === "paste" && (
                       <textarea
                         value={jobDesc}
-                        onChange={(e) => setJobDesc(e.target.value)}
-                        placeholder="Paste the full job description here..."
+                        onChange={(e) =>
+                          setJobDesc(e.target.value)
+                        }
+                        placeholder="Paste the complete job description here..."
                         className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none h-64"
                       />
                     )}
 
                     {activeJDTab === "upload" && (
-                      <div className="border-2 border-dashed border-orange-300 rounded-xl p-8 text-center hover:border-orange-500 hover:bg-orange-50 transition-all">
+                      <div className="border-2 border-dashed border-orange-300 rounded-xl p-6 text-center hover:border-orange-500 hover:bg-orange-50 transition-all">
                         <Upload className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                         <p className="text-gray-600 mb-2">
                           Drag and drop your job description here
                         </p>
-                        <button className="text-orange-600 hover:text-orange-700 font-medium">
-                          or click to browse
-                        </button>
-                        <p className="mt-2 text-xs text-gray-500">
-                          (File upload is visual only right now — best results
-                          come from pasting the text.)
-                        </p>
+                        <label className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-orange-700 bg-white border border-orange-300 rounded-lg cursor-pointer hover:bg-orange-50">
+                          <span>Click to browse</span>
+                          <input
+                            type="file"
+                            accept=".txt,.md,.doc,.docx,.pdf"
+                            className="hidden"
+                            onChange={(e) =>
+                              handleJDFileChange(
+                                e.target.files?.[0] || null
+                              )
+                            }
+                          />
+                        </label>
+                        {uploadedJDFileName && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            Selected: {uploadedJDFileName}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  {/* RESUME CARD WITH TABS (PASTE / UPLOAD / SAVED) */}
+                  {/* Resume Input */}
                   <div className="p-8 rounded-2xl bg-gradient-to-br from-pink-50 to-white border-2 border-pink-200 hover:shadow-lg transition-shadow flex flex-col">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-600 to-pink-700 flex items-center justify-center">
@@ -334,7 +629,7 @@ export default function JobFit() {
                           key={tab.id}
                           onClick={() =>
                             setActiveResumeTab(
-                              tab.id as "paste" | "upload" | "saved"
+                              tab.id as ActiveResumeTab
                             )
                           }
                           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -351,66 +646,78 @@ export default function JobFit() {
                     {activeResumeTab === "paste" && (
                       <textarea
                         value={resumeContent}
-                        onChange={(e) => setResumeContent(e.target.value)}
+                        onChange={(e) =>
+                          setResumeContent(e.target.value)
+                        }
                         placeholder="Paste your resume here..."
                         className="flex-1 px-4 py-3 border-2 border-pink-200 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
                       />
                     )}
 
                     {activeResumeTab === "upload" && (
-                      <div className="border-2 border-dashed border-pink-300 rounded-xl p-8 text-center hover:border-pink-500 hover:bg-pink-50 transition-all">
+                      <div className="border-2 border-dashed border-pink-300 rounded-xl p-6 text-center hover:border-pink-500 hover:bg-pink-50 transition-all">
                         <Upload className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                         <p className="text-gray-600 mb-2">
                           Drag and drop your resume here
                         </p>
-                        <button className="text-pink-600 hover:text-pink-700 font-medium">
-                          or click to browse
-                        </button>
-                        <p className="mt-2 text-xs text-gray-500">
-                          (For now this is a visual dropzone — paste text for
-                          best results.)
-                        </p>
+                        <label className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-pink-700 bg-white border border-pink-300 rounded-lg cursor-pointer hover:bg-pink-50">
+                          <span>Click to browse</span>
+                          <input
+                            type="file"
+                            accept=".txt,.doc,.docx,.pdf"
+                            className="hidden"
+                            onChange={(e) =>
+                              setUploadedResumeFile(
+                                e.target.files?.[0] || null
+                              )
+                            }
+                          />
+                        </label>
+                        {uploadedResumeFile && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            Selected: {uploadedResumeFile.name}
+                          </p>
+                        )}
                       </div>
                     )}
 
                     {activeResumeTab === "saved" && (
                       <div className="space-y-3 flex-1">
-                        {savedResumes.length === 0 ? (
-                          <div className="p-6 rounded-xl border-2 border-dashed border-pink-200 bg-white text-center">
-                            <p className="text-sm text-gray-700 font-medium mb-1">
-                              No saved resumes yet
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Save a resume on the Enhance Resume page to use it
-                              here, or paste/upload your resume above.
-                            </p>
-                          </div>
-                        ) : (
-                          savedResumes.map((resume) => (
+                        {token ? (
+                          checkingSavedResume ? (
+                            <div className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-600">
+                              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                              Checking saved resume...
+                            </div>
+                          ) : hasSavedResume ? (
                             <button
-                              key={resume.id}
-                              onClick={() =>
-                                setResumeContent(`[Using: ${resume.name}]`)
-                              }
-                              className={`w-full flex items-center gap-3 p-4 text-left border-2 rounded-xl transition-all ${
-                                resumeContent.includes(resume.name)
-                                  ? "border-pink-300 bg-pink-50"
-                                  : "border-gray-200 bg-white hover:border-pink-200"
-                              }`}
+                              type="button"
+                              className="w-full flex items-center gap-3 p-4 text-left border-2 rounded-xl transition-all border-pink-300 bg-pink-50"
                             >
                               <FileText className="h-5 w-5 text-pink-600 flex-shrink-0" />
                               <span className="font-medium text-gray-900">
-                                {resume.name}
+                                Using your saved resume on file
                               </span>
                             </button>
-                          ))
+                          ) : (
+                            <div className="w-full p-4 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-600 bg-white">
+                              No saved resume found for your account. Switch to
+                              "Paste" or "Upload" to save one during analysis.
+                            </div>
+                          )
+                        ) : (
+                          <div className="w-full p-4 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-600 bg-white">
+                            Log in to use a saved resume. You can still paste or
+                            upload a resume and we’ll save it for this account
+                            when analyzing.
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* ANALYZE BUTTON */}
+                {/* Analyze Button */}
                 <button
                   onClick={handleAnalyzeResume}
                   disabled={isAnalyzing}
@@ -419,7 +726,7 @@ export default function JobFit() {
                   {isAnalyzing ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Analyzing...
+                      Analyzing Job Fit...
                     </>
                   ) : (
                     <>
@@ -428,19 +735,15 @@ export default function JobFit() {
                     </>
                   )}
                 </button>
-
-                {status && (
-                  <p className="text-center text-sm text-gray-600">{status}</p>
-                )}
               </div>
             ) : (
-              /* STEP 2: ANALYSIS RESULTS */
+              // Step 2: Analysis Results
               <div className="space-y-8">
                 <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-                  Step 2: Review Your Analysis Results
+                  Step 2: Review Your Match Analysis
                 </h2>
 
-                {/* MATCH SCORE */}
+                {/* Match Score Card */}
                 <div className="p-8 rounded-2xl bg-gradient-to-br from-orange-50 to-pink-50 border-2 border-orange-200 hover:shadow-lg transition-shadow">
                   <div className="flex flex-col sm:flex-row items-center justify-between">
                     <div>
@@ -448,8 +751,17 @@ export default function JobFit() {
                         Overall Match Score
                       </h2>
                       <p className="text-gray-600">
-                        How well your resume aligns with the job description
+                        How well your current resume aligns with the job
+                        description
                       </p>
+                      {improvementExplanation && (
+                        <p className="mt-3 text-sm text-gray-700">
+                          <span className="font-semibold">
+                            Why the tailored version is better:
+                          </span>{" "}
+                          {improvementExplanation}
+                        </p>
+                      )}
                     </div>
                     <div className="mt-8 sm:mt-0 flex flex-col items-center">
                       <div className="relative w-32 h-32 flex items-center justify-center">
@@ -476,7 +788,9 @@ export default function JobFit() {
                               (analysis.matchScore / 100) * 351.86
                             } 351.86`}
                             strokeLinecap="round"
-                            style={{ transition: "stroke-dasharray 1s ease" }}
+                            style={{
+                              transition: "stroke-dasharray 1s ease",
+                            }}
                           />
                           <defs>
                             <linearGradient
@@ -486,7 +800,10 @@ export default function JobFit() {
                               x2="100%"
                               y2="100%"
                             >
-                              <stop offset="0%" stopColor="rgb(234, 88, 12)" />
+                              <stop
+                                offset="0%"
+                                stopColor="rgb(234, 88, 12)"
+                              />
                               <stop
                                 offset="100%"
                                 stopColor="rgb(236, 72, 153)"
@@ -498,14 +815,16 @@ export default function JobFit() {
                           <div className="text-5xl font-bold text-transparent bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text">
                             {analysis.matchScore}%
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Match</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Match
+                          </p>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* STRENGTHS & MISSING SKILLS */}
+                {/* Analysis Sections */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className="p-8 rounded-2xl bg-gradient-to-br from-green-50 to-white border-2 border-green-200 hover:shadow-lg transition-shadow">
                     <div className="flex items-center gap-3 mb-6">
@@ -518,7 +837,10 @@ export default function JobFit() {
                     </div>
                     <ul className="space-y-4">
                       {analysis.strengths.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-3">
+                        <li
+                          key={idx}
+                          className="flex items-start gap-3"
+                        >
                           <span className="text-green-600 text-lg font-bold flex-shrink-0">
                             ✓
                           </span>
@@ -539,7 +861,10 @@ export default function JobFit() {
                     </div>
                     <ul className="space-y-4">
                       {analysis.missingSkills.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-3">
+                        <li
+                          key={idx}
+                          className="flex items-start gap-3"
+                        >
                           <span className="text-yellow-600 text-lg font-bold flex-shrink-0">
                             ⚠
                           </span>
@@ -550,7 +875,6 @@ export default function JobFit() {
                   </div>
                 </div>
 
-                {/* RED FLAGS */}
                 <div className="p-8 rounded-2xl bg-gradient-to-br from-red-50 to-white border-2 border-red-200 hover:shadow-lg transition-shadow">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
@@ -572,7 +896,6 @@ export default function JobFit() {
                   </ul>
                 </div>
 
-                {/* RECOMMENDATIONS */}
                 <div className="p-8 rounded-2xl bg-gradient-to-br from-blue-50 to-white border-2 border-blue-200 hover:shadow-lg transition-shadow">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
@@ -592,23 +915,23 @@ export default function JobFit() {
                   </ul>
                 </div>
 
-                {/* ACTION BUTTONS – STEP 3 GET OPTIMIZED RESUME */}
+                {/* Action Buttons */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {!optimizedResume && (
+                  {!enhancedResume && (
                     <button
-                      onClick={handleOptimizeResume}
-                      disabled={isOptimizing}
+                      onClick={handleEnhanceResume}
+                      disabled={isEnhancing}
                       className="px-6 py-4 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-600 to-pink-600 text-white hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                     >
-                      {isOptimizing ? (
+                      {isEnhancing ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Building Optimized Resume...
+                          Enhancing Resume...
                         </>
                       ) : (
                         <>
                           <Wand2 className="h-5 w-5" />
-                          Step 3: Get Optimized Resume
+                          Step 3: Tailor Resume to Job
                         </>
                       )}
                     </button>
@@ -620,18 +943,14 @@ export default function JobFit() {
                     Analyze Another Job
                   </button>
                 </div>
-
-                {status && (
-                  <p className="text-center text-sm text-gray-600">{status}</p>
-                )}
               </div>
             )}
 
-            {/* STEP 4: OPTIMIZED RESUME OUTPUT */}
-            {optimizedResume && (
+            {/* Tailored Resume Output */}
+            {enhancedResume && (
               <div className="mt-12 space-y-8">
                 <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-                  Step 4: Your Optimized Resume
+                  Step 4: Your Tailored Resume
                 </h2>
 
                 <div className="p-8 rounded-2xl bg-gradient-to-br from-green-50 to-white border-2 border-green-200 hover:shadow-lg transition-shadow">
@@ -640,26 +959,27 @@ export default function JobFit() {
                       <CheckCircle2 className="h-5 w-5 text-white" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900">
-                      AI-Enhanced Resume
+                      AI-Tailored Resume
                     </h3>
                   </div>
 
                   <textarea
-                    value={optimizedResume}
+                    value={enhancedResume}
                     readOnly
                     className="w-full px-4 py-3 border-2 border-green-200 rounded-xl bg-white text-gray-900 resize-none h-80 mb-6"
                   />
 
                   <div className="p-4 rounded-lg bg-green-100 border border-green-200 mb-6">
                     <p className="text-sm text-green-900">
-                      ✓ Your resume is now optimized for this job description.
-                      You can still tweak the content before sending.
+                      ✓ This version keeps your real experience, but is
+                      rewritten and reorganized to better match this specific
+                      job.
                     </p>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-4">
                     <button
-                      onClick={handleCopyOptimized}
+                      onClick={handleCopyResume}
                       className={`flex-1 px-6 py-3 text-base font-semibold rounded-xl transition-all flex items-center justify-center gap-2 ${
                         copied
                           ? "bg-green-600 text-white"
@@ -670,7 +990,7 @@ export default function JobFit() {
                       {copied ? "Copied!" : "Copy to Clipboard"}
                     </button>
                     <button
-                      onClick={handleDownloadOptimized}
+                      onClick={handleDownloadResume}
                       className="flex-1 px-6 py-3 text-base font-semibold rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:shadow-lg transition-all flex items-center justify-center gap-2"
                     >
                       <Download className="h-5 w-5" />

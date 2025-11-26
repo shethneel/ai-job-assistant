@@ -26,9 +26,10 @@ MODEL_NAME = "gpt-4o-mini"
 
 def clean_json_output(raw: str) -> str:
     """
-    Clean model output to extract the JSON object:
+    Clean model output to extract a valid JSON object:
     - strip backticks / ```json fences
     - slice from first '{' to last '}'
+    - convert any Python-style triple-quoted strings into proper JSON strings
     """
     if not raw:
         return raw
@@ -37,7 +38,7 @@ def clean_json_output(raw: str) -> str:
 
     # Remove ``` or ```json fences if present
     if text.startswith("```"):
-        # Strip all backticks
+        # Strip all surrounding backticks
         text = text.strip("`").strip()
         # If it starts with 'json', remove that word
         if text.lower().startswith("json"):
@@ -48,6 +49,28 @@ def clean_json_output(raw: str) -> str:
     end = text.rfind("}")
     if start != -1 and end != -1 and end > start:
         text = text[start : end + 1]
+
+    # Some models sometimes return Python-style triple-quoted strings, e.g.:
+    #   "tailored_resume": """ ... """
+    # This is not valid JSON, so we convert those blocks into a normal JSON
+    # string, escaping newlines and quotes using json.dumps.
+    import re as _re
+    import json as _json
+
+    def _replace_triple_quoted(field_name: str, source: str) -> str:
+        pattern = rf'"{field_name}"\s*:\s*"""(.*?)"""'
+
+        def _repl(match: "_re.Match[str]") -> str:
+            inner = match.group(1)
+            # json.dumps will escape newlines and quotes properly; we strip the
+            # outer quotes because we add them ourselves.
+            safe = _json.dumps(inner)[1:-1]
+            return f'"{field_name}": "{safe}"'
+
+        return _re.sub(pattern, _repl, source, flags=_re.DOTALL)
+
+    text = _replace_triple_quoted("tailored_resume", text)
+    text = _replace_triple_quoted("improvement_explanation", text)
 
     return text
 
@@ -111,7 +134,29 @@ You will receive:
 - The candidate’s FULL current resume (raw text)
 - A job description
 
-Your job is to produce a **tailored version of the resume** that highlights relevant skills and experience **without removing any actual content**.
+Your job is to produce a **tailored version of the resume** that keeps all of the candidate’s real skills and experience, but:
+- emphasizes the parts that are most relevant to the job
+- adjusts wording to mirror the job description where honest
+- improves clarity and impact
+- removes redundancy or awkward phrasing
+- keeps the length roughly similar to the original resume
+
+You must then:
+1. Analyze the current match vs. the job.
+2. Generate a tailored resume that is closer to the job requirements.
+3. Re-analyze the tailored resume and report the improved match.
+4. Explain how the tailored resume is better aligned.
+
+The tailored resume must use **only information that already exists** in the candidate’s resume. You may:
+- rewrite sentences
+- reorder bullets
+- emphasize or de-emphasize details
+- group related skills
+
+But you may NOT:
+- invent new jobs, companies, responsibilities, or education
+- add fake technologies or tools the candidate did not mention
+- claim leadership or achievements that cannot be reasonably inferred from the original resume
 
 VERY IMPORTANT RULES (MUST FOLLOW):
 - Do NOT remove any experience, projects, or education.
@@ -162,7 +207,10 @@ Job Description:
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError as exc:
-        logger.exception("Failed to parse JSON from OpenAI tailor response: %s", raw_output)
+        logger.exception(
+            "Failed to parse JSON from OpenAI tailor response: %s",
+            raw_output,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to parse AI response while tailoring resume.",
