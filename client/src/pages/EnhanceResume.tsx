@@ -48,15 +48,24 @@ export default function EnhanceResume() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setSelectedFile(file);
+    // For plain text files we can safely preview the content.
+    // For DOCX/PDF we skip preview to avoid the gibberish binary output
+    // and just show a simple placeholder message instead. The actual file
+    // contents are still sent to the backend for AI processing.
+    const extension = file.name.toLowerCase().split(".").pop();
 
-    // Optional: try to show text preview (works nicely for .txt/.docx)
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = reader.result?.toString() || "";
-      setResumeText(text);
-    };
-    reader.readAsText(file);
+    if (extension === "txt") {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = reader.result?.toString() || "";
+        setResumeText(text);
+      };
+      reader.readAsText(file);
+    } else {
+      setResumeText(
+        `Uploaded file: ${file.name}\n\nPreview is not shown for this file type, but AI will read it correctly when you click "Enhance Resume".`
+      );
+    }
   };
 
   const buildFormData = (): FormData => {

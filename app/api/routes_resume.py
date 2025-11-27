@@ -17,7 +17,7 @@ router = APIRouter()
 client = OpenAI()
 
 # Cheap but good model
-MODEL_NAME = "gpt-4o-mini"
+MODEL_NAME = "gpt-4.1-mini"  # you can switch back to "gpt-4o-mini" if you prefer
 
 
 class ResumeImproveResponse(BaseModel):
@@ -129,71 +129,91 @@ VERY IMPORTANT RULES:
 - Do NOT remove any experience, projects, or education from the original.
 - Do NOT drop any important technical tools, languages, or technologies mentioned.
 - You may rewrite sentences for clarity and impact, but you must keep all the original content and details.
-- The length of each version should be roughly the SAME as the original text (not significantly shorter). It's okay if it's slightly longer.
-- Keep the structure as a full resume with sections (e.g., TECHNICAL SKILLS, EXPERIENCE, PROJECTS, EDUCATION).
+- Never invent fake companies, fake degrees, or fake job titles.
+- Keep dates and factual information unchanged.
 
-Return them in JSON exactly as:
+Return your answer as a strict JSON object with this exact shape:
+
 {{
-  "version1": "...",
-  "version2": "...",
-  "version3": "..."
+  "version1": "First improved resume as a single plain text string",
+  "version2": "Second improved resume as a single plain text string",
+  "version3": "Third improved resume as a single plain text string"
 }}
 
-Return ONLY a valid JSON object. Do not add code fences, markdown, or any explanation.
+The values must be plain text resumes (multi-line text is OK).
+Do not include any markdown, backticks, bullet symbols like • in the JSON keys,
+and do not output anything outside the JSON object.
 
-Resume text:
+Here is the original resume:
+
 \"\"\"{resume_text}\"\"\"
 """
 
-    # ✅ 3. Call OpenAI
+    # ✅ 3. Call OpenAI using chat.completions with JSON response_format
     try:
-        response = client.responses.create(
+        completion = client.chat.completions.create(
             model=MODEL_NAME,
-            input=prompt,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that outputs strictly valid JSON.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            temperature=0.4,
         )
-    except Exception as exc:
-        logger.exception("OpenAI API call failed")
+    except Exception as e:
+        logger.exception("Error while calling OpenAI for resume improvement: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error while generating improved resume versions.",
-        ) from exc
+            detail="Failed to generate improved resume. Please try again.",
+        ) from e
 
-    # ✅ 4. Get raw text
-    raw_output = response.output_text
-    logger.info("Raw model output: %s", raw_output)
+    # ✅ 4. Get raw JSON string from the model
+    raw_output = completion.choices[0].message.content or ""
+    cleaned = raw_output.strip()
 
-    # ✅ 5. Clean markdown fences if present
-    clean_output = raw_output.strip()
+    # Defensive cleanup if the model ever wraps in ```json ... ```
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        cleaned = "\n".join(lines).strip()
 
-    # If it starts with ``` (like ```json), strip those lines
-    if clean_output.startswith("```"):
-        lines = clean_output.splitlines()
-        # Drop any lines that are just ``` or start with ```json
-        stripped_lines = [
-            line for line in lines if not line.strip().startswith("```")
-        ]
-        clean_output = "\n".join(stripped_lines).strip()
+    # Also trim to outermost {...} just in case
+    if "{" in cleaned and "}" in cleaned:
+        cleaned = cleaned[cleaned.find("{") : cleaned.rfind("}") + 1]
 
-    # As an extra safety: grab just the JSON object between { and }
-    if "{" in clean_output and "}" in clean_output:
-        start = clean_output.find("{")
-        end = clean_output.rfind("}")
-        clean_output = clean_output[start : end + 1]
+    logger.info("Raw AI JSON for resume improve: %s", cleaned)
 
-    # ✅ 6. Parse JSON from the cleaned output
+    # ✅ 5. Parse JSON from the cleaned output
     try:
-        data = json.loads(clean_output)
-        version1 = data["version1"]
-        version2 = data["version2"]
-        version3 = data["version3"]
-    except (json.JSONDecodeError, KeyError, TypeError) as exc:
-        logger.exception("Failed to parse model JSON output: %s", clean_output)
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        logger.error("Failed to parse model JSON output: %s", cleaned)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to parse AI response. Please try again.",
-        ) from exc
+        )
 
-    # ✅ 7. Return in our existing format
-    return ResumeImproveResponse(
-        versions=[version1, version2, version3]
-    )
+    version1 = str(data.get("version1", "")).strip()
+    version2 = str(data.get("version2", "")).strip()
+    version3 = str(data.get("version3", "")).strip()
+
+    versions = [v for v in (version1, version2, version3) if v]
+
+    if len(versions) != 3:
+        logger.error("AI response missing one or more versions: %s", data)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AI did not return three improved resume versions.",
+        )
+
+    # ✅ 6. Return in existing format expected by the frontend
+    return ResumeImproveResponse(versions=versions)

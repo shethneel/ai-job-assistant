@@ -1,4 +1,4 @@
-# app/schemas.py (OR inside routes_user_resume.py if you prefer)
+# app/schemas.py
 
 from datetime import datetime
 from pydantic import BaseModel
@@ -14,3 +14,12 @@ class ResumeRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ResumeRenameRequest(BaseModel):
+    """
+    Payload for renaming a saved resume.
+    We only change the display name (original_filename),
+    not the actual file contents.
+    """
+    new_filename: str
