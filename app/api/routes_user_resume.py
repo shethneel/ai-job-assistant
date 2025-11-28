@@ -1,6 +1,5 @@
-# app/api/routes_user_resume.py
-
 from datetime import datetime
+from typing import List
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from sqlmodel import Session, select
@@ -13,6 +12,8 @@ from app.api.routes_auth import get_current_user
 
 router = APIRouter(prefix="/user/resume", tags=["user-resume"])
 
+MAX_RESUMES_PER_USER = 3
+
 
 @router.post("/upload", response_model=ResumeRead)
 async def upload_resume(
@@ -21,11 +22,14 @@ async def upload_resume(
     current_user: User = Depends(get_current_user),
 ) -> ResumeRead:
     """
-    Upload or replace the user's current resume.
+    Upload a new saved resume for the user.
 
-    Right now we keep a single saved resume per user.
-    (You’re still within the "max 3 resumes" limit.)
-    If a resume already exists, we update it in-place.
+    Rules:
+    - Each user can have up to MAX_RESUMES_PER_USER resumes saved.
+    - If the user already has 3 resumes, we block the upload and ask them
+      to delete one from the "My Resumes" page first.
+    - The *most recently updated* resume is treated as the "primary" one and
+      is what /user/resume (GET) returns for Job Fit / Cover Letter.
     """
 
     # 1) Extract text from the uploaded file
@@ -37,23 +41,20 @@ async def upload_resume(
             detail="Could not read resume file. Please upload a valid document.",
         ) from exc
 
-    # 2) Check if user already has a resume
+    # 2) How many resumes does this user already have?
     statement = select(Resume).where(Resume.user_id == current_user.id)
-    existing_resume = db.exec(statement).first()
+    existing_resumes = db.exec(statement).all()
+
+    if len(existing_resumes) >= MAX_RESUMES_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"You already have {MAX_RESUMES_PER_USER} saved resumes. "
+                "Please delete one from My Resumes before saving a new one."
+            ),
+        )
 
     now = datetime.utcnow()
-
-    if existing_resume:
-        # Update existing record
-        existing_resume.original_filename = file.filename or existing_resume.original_filename
-        existing_resume.content_type = file.content_type
-        existing_resume.extracted_text = extracted_text
-        existing_resume.updated_at = now
-
-        db.add(existing_resume)
-        db.commit()
-        db.refresh(existing_resume)
-        return existing_resume
 
     # 3) Create a new resume record
     new_resume = Resume(
@@ -72,14 +73,22 @@ async def upload_resume(
 
 
 @router.get("", response_model=ResumeRead)
-def get_resume(
+def get_primary_resume(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ResumeRead:
     """
-    Get the single saved resume for the current user.
+    Get the *primary* saved resume for the current user.
+
+    We define "primary" as the most recently updated resume.
+    This keeps Job Fit / Cover Letter behaviour unchanged: they still
+    call /user/resume and get exactly one resume.
     """
-    statement = select(Resume).where(Resume.user_id == current_user.id)
+    statement = (
+        select(Resume)
+        .where(Resume.user_id == current_user.id)
+        .order_by(Resume.updated_at.desc())
+    )
     resume = db.exec(statement).first()
 
     if not resume:
@@ -91,6 +100,53 @@ def get_resume(
     return resume
 
 
+@router.get("/list", response_model=List[ResumeRead])
+def list_resumes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> List[ResumeRead]:
+    """
+    Return up to MAX_RESUMES_PER_USER resumes for the current user,
+    ordered by most-recently-updated first.
+
+    This is used by the My Resumes page to show all saved resumes.
+    """
+    statement = (
+        select(Resume)
+        .where(Resume.user_id == current_user.id)
+        .order_by(Resume.updated_at.desc())
+    )
+    resumes = db.exec(statement).all()
+    return resumes
+
+
+@router.delete("/{resume_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_resume(
+    resume_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """
+    Delete a specific resume by ID for the current user.
+
+    Used when the user wants to free up a slot (max 3 resumes).
+    """
+    statement = select(Resume).where(
+        Resume.id == resume_id, Resume.user_id == current_user.id
+    )
+    resume = db.exec(statement).first()
+
+    if not resume:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found.",
+        )
+
+    db.delete(resume)
+    db.commit()
+    # 204 No Content – nothing to return
+
+
 @router.patch("/rename", response_model=ResumeRead)
 def rename_resume(
     payload: ResumeRenameRequest,
@@ -98,13 +154,11 @@ def rename_resume(
     current_user: User = Depends(get_current_user),
 ) -> ResumeRead:
     """
-    Rename the user's current saved resume.
+    Rename the user's *primary* resume.
 
-    This only changes original_filename (the display name),
-    not the text or the underlying file.
-
-    In the future, if you support multiple resumes per user,
-    you can extend this to accept a specific resume_id.
+    We still keep this endpoint simple (no ID) so it only renames the
+    most recently updated resume – effectively, the one the user is
+    currently working with in the flows.
     """
     new_name = payload.new_filename.strip()
     if not new_name:
@@ -113,7 +167,11 @@ def rename_resume(
             detail="New resume name cannot be empty.",
         )
 
-    statement = select(Resume).where(Resume.user_id == current_user.id)
+    statement = (
+        select(Resume)
+        .where(Resume.user_id == current_user.id)
+        .order_by(Resume.updated_at.desc())
+    )
     resume = db.exec(statement).first()
 
     if not resume:

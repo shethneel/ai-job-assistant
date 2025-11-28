@@ -12,7 +12,10 @@ import JobFit from "./pages/JobFit";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import MyResumes from "./pages/MyResumes"; // ⬅️ NEW
+import MyResumes from "./pages/MyResumes";
+import Pricing from "./pages/Pricing";
+import Documentation from "./pages/Documentation";
+
 
 export default function App() {
   return (
@@ -25,7 +28,9 @@ export default function App() {
           <Route path="/enhance-resume" element={<EnhanceResume />} />
           <Route path="/cover-letter" element={<CoverLetter />} />
           <Route path="/job-fit" element={<JobFit />} />
-          <Route path="/my-resumes" element={<MyResumes />} /> {/* ⬅️ NEW */}
+          <Route path="/my-resumes" element={<MyResumes />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/documentation" element={<Documentation />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="*" element={<NotFound />} />

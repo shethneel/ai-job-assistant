@@ -7,6 +7,7 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -23,7 +24,7 @@ interface ResumeApi {
 }
 
 export default function MyResumes() {
-  const [resume, setResume] = useState<ResumeApi | null>(null);
+  const [resumes, setResumes] = useState<ResumeApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");
@@ -32,52 +33,54 @@ export default function MyResumes() {
 
   const navigate = useNavigate();
 
+  const getToken = () =>
+    localStorage.getItem("jobAgentToken") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken");
+
+  // Load all resumes (up to 3)
   useEffect(() => {
-    const token =
-      localStorage.getItem("jobAgentToken") ||
-      localStorage.getItem("token") ||
-      localStorage.getItem("accessToken");
+    const token = getToken();
 
     if (!token) {
-      setError("Please log in to view and manage your saved resume.");
+      setError("Please log in to view and manage your saved resumes.");
       setLoading(false);
       return;
     }
 
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/user/resume`, {
+        const res = await fetch(`${API_BASE_URL}/user/resume/list`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
-        if (res.status === 404) {
-          setResume(null);
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "Failed to load saved resumes.");
+        }
+
+        const data: ResumeApi[] = await res.json();
+        setResumes(Array.isArray(data) ? data : []);
+        if (data.length === 0) {
           setStatus(
             "You don't have a saved resume yet. Save one from Job Fit or Enhance Resume."
           );
-          return;
         }
-
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || "Failed to load saved resume.");
-        }
-
-        const data: ResumeApi = await res.json();
-        setResume(data);
       } catch (err: any) {
         console.error(err);
-        setError(err?.message || "Failed to load saved resume.");
+        setError(err?.message || "Failed to load saved resumes.");
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const handleDownload = () => {
-    if (!resume) return;
+  const primaryResume = resumes[0] || null;
+  const otherResumes = resumes.slice(1);
+
+  const handleDownload = (resume: ResumeApi) => {
     const content = resume.extracted_text || "";
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -88,12 +91,12 @@ export default function MyResumes() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setStatus("Downloaded your saved resume as a .txt file.");
+    setStatus("Downloaded resume as a .txt file.");
   };
 
   const startRename = () => {
-    if (!resume) return;
-    setNewName(resume.original_filename || "");
+    if (!primaryResume) return;
+    setNewName(primaryResume.original_filename || "");
     setRenaming(true);
     setStatus(null);
     setError(null);
@@ -105,18 +108,14 @@ export default function MyResumes() {
   };
 
   const submitRename = async () => {
-    if (!resume) return;
+    if (!primaryResume) return;
     const trimmed = newName.trim();
     if (!trimmed) {
       setError("Resume name cannot be empty.");
       return;
     }
 
-    const token =
-      localStorage.getItem("jobAgentToken") ||
-      localStorage.getItem("token") ||
-      localStorage.getItem("accessToken");
-
+    const token = getToken();
     if (!token) {
       setError("Please log in again to rename your resume.");
       return;
@@ -140,9 +139,16 @@ export default function MyResumes() {
         throw new Error(text || "Failed to rename resume.");
       }
 
-      const data: ResumeApi = await res.json();
-      setResume(data);
-      setStatus("Resume name updated.");
+      const updated: ResumeApi = await res.json();
+
+      // Update in local list (primary is always index 0)
+      setResumes((prev) =>
+        prev.length === 0
+          ? [updated]
+          : [updated, ...prev.slice(1)]
+      );
+
+      setStatus("Primary resume name updated.");
       setRenaming(false);
     } catch (err: any) {
       console.error(err);
@@ -150,17 +156,56 @@ export default function MyResumes() {
     }
   };
 
-  const formattedDate = resume
-    ? new Date(resume.created_at).toLocaleDateString()
-    : "";
+  const handleDelete = async (resume: ResumeApi) => {
+    const token = getToken();
+    if (!token) {
+      setError("Please log in again to delete a resume.");
+      return;
+    }
+
+    const confirm = window.confirm(
+      "Are you sure you want to delete this resume? This cannot be undone."
+    );
+    if (!confirm) return;
+
+    try {
+      setError(null);
+      setStatus("Deleting resume…");
+
+      const res = await fetch(
+        `${API_BASE_URL}/user/resume/${resume.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to delete resume.");
+      }
+
+      setResumes((prev) => prev.filter((r) => r.id !== resume.id));
+
+      setStatus("Resume deleted. You can now save another one (max 3).");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Failed to delete resume.");
+    }
+  };
 
   const handleCreateNew = () => {
     navigate("/enhance-resume");
   };
 
+  const formatDate = (isoString: string) =>
+    new Date(isoString).toLocaleDateString();
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      {/* App.tsx already provides Header + Footer, so just content here */}
+      {/* Header & Footer are provided by App.tsx; this is only page body */}
       <main className="flex-1">
         {/* Header Section */}
         <section className="px-4 sm:px-6 lg:px-8 py-12 bg-gradient-to-br from-blue-50 via-white to-purple-50 border-b border-gray-200">
@@ -174,7 +219,9 @@ export default function MyResumes() {
               </h1>
             </div>
             <p className="text-lg text-gray-600">
-              Manage your saved resume that powers Job Fit and Cover Letters.
+              Store up to <strong>3 resumes</strong>. The most recent one is
+              automatically used as your saved resume in Job Fit and Cover
+              Letters.
             </p>
           </div>
         </section>
@@ -185,11 +232,12 @@ export default function MyResumes() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                  Your Saved Resume
+                  Your Saved Resumes ({resumes.length}/3)
                 </h2>
                 <p className="text-gray-600 text-sm">
-                  This resume is reused in Job Fit and Cover Letter when you
-                  choose the saved option.
+                  The latest resume you save becomes the{" "}
+                  <strong>primary</strong> one used automatically in other
+                  tools.
                 </p>
               </div>
               <button
@@ -205,7 +253,7 @@ export default function MyResumes() {
             {loading && (
               <div className="flex items-center justify-center py-16 text-gray-600 gap-2">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Loading your saved resume…</span>
+                <span>Loading your saved resumes…</span>
               </div>
             )}
 
@@ -223,28 +271,53 @@ export default function MyResumes() {
               </div>
             )}
 
-            {!loading && !error && (
+            {!loading && !error && resumes.length === 0 && (
+              <div className="p-12 rounded-lg border border-gray-200 bg-gray-50 text-center">
+                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  No saved resumes yet
+                </h3>
+                <p className="text-gray-600 mb-4 max-w-md mx-auto">
+                  Once you upload a resume on the Job Fit or Enhance Resume
+                  pages, it will appear here so you can manage and reuse it.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCreateNew}
+                  className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transition-all"
+                >
+                  <Sparkles className="h-5 w-5 mr-2" />
+                  Upload Your First Resume
+                </button>
+              </div>
+            )}
+
+            {!loading && !error && resumes.length > 0 && (
               <>
-                {resume ? (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-6 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 hover:shadow-lg transition-all">
+                {/* Primary resume card */}
+                {primaryResume && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-6 border-2 border-blue-300 rounded-lg bg-blue-50/70 hover:shadow-lg transition-all">
                     <div className="flex items-start gap-4 flex-1 mb-4 sm:mb-0">
                       <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0">
                         <FileText className="h-6 w-6 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-blue-700 mb-1">
+                          Primary resume (used in Job Fit & Cover Letter)
+                        </p>
                         {!renaming ? (
                           <>
                             <h3 className="font-semibold text-gray-900 mb-1 break-words">
-                              {resume.original_filename || "Saved Resume"}
+                              {primaryResume.original_filename || "Saved Resume"}
                             </h3>
                             <p className="text-sm text-gray-600">
-                              Saved on {formattedDate}
+                              Saved on {formatDate(primaryResume.created_at)}
                             </p>
                           </>
                         ) : (
                           <div className="space-y-2">
                             <label className="text-xs font-medium text-gray-600">
-                              Rename resume
+                              Rename primary resume
                             </label>
                             <input
                               type="text"
@@ -286,34 +359,69 @@ export default function MyResumes() {
                         </button>
                         <button
                           type="button"
-                          onClick={handleDownload}
+                          onClick={() => handleDownload(primaryResume)}
                           className="flex-1 sm:flex-none px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center gap-1 text-sm"
                         >
                           <Download className="h-4 w-4" />
                           Download
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(primaryResume)}
+                          className="flex-1 sm:flex-none px-3 py-2 rounded-lg border border-red-200 hover:bg-red-50 flex items-center justify-center gap-1 text-sm text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </button>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="p-12 rounded-lg border border-gray-200 bg-gray-50 text-center">
-                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      No saved resume yet
+                )}
+
+                {/* Other resumes (up to 2 more) */}
+                {otherResumes.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-800 mt-6">
+                      Other saved resumes
                     </h3>
-                    <p className="text-gray-600 mb-4 max-w-md mx-auto">
-                      Once you upload a resume on the Job Fit page or Enhance
-                      Resume, it will appear here so you can manage and reuse
-                      it.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleCreateNew}
-                      className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transition-all"
-                    >
-                      <Sparkles className="h-5 w-5 mr-2" />
-                      Upload Your First Resume
-                    </button>
+                    {otherResumes.map((resume) => (
+                      <div
+                        key={resume.id}
+                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50/60 hover:shadow transition-all"
+                      >
+                        <div className="flex items-start gap-3 flex-1 mb-3 sm:mb-0">
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                            <FileText className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-gray-900 break-words">
+                              {resume.original_filename || "Saved Resume"}
+                            </h4>
+                            <p className="text-xs text-gray-600">
+                              Saved on {formatDate(resume.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(resume)}
+                            className="flex-1 sm:flex-none px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center gap-1 text-sm"
+                          >
+                            <Download className="h-4 w-4" />
+                            Download
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(resume)}
+                            className="flex-1 sm:flex-none px-3 py-2 rounded-lg border border-red-200 hover:bg-red-50 flex items-center justify-center gap-1 text-sm text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -326,10 +434,10 @@ export default function MyResumes() {
                         Pro Tip
                       </h3>
                       <p className="text-blue-800 text-sm">
-                        Your saved resume powers the{" "}
-                        <strong>Saved Resume</strong> options in Job Fit and
-                        Cover Letter. Keep its name clear so you always know
-                        which version you’re using.
+                        You can keep up to <strong>3 different resumes</strong>{" "}
+                        here – for example, one for software roles, one for data
+                        roles, and one for product roles. If you hit the limit,
+                        just delete an older one and save a fresh version.
                       </p>
                     </div>
                   </div>
