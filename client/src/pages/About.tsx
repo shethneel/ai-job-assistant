@@ -1,6 +1,3 @@
-// client/src/pages/About.tsx
-import Header from "../components/Header";
-import Footer from "../components/Footer";
 import {
   Heart,
   Lightbulb,
@@ -69,7 +66,6 @@ export default function About() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      <Header />
 
       <main className="flex-1">
         {/* Hero Section */}
@@ -378,7 +374,6 @@ export default function About() {
         </section>
       </main>
 
-      <Footer />
     </div>
   );
 }
