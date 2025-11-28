@@ -15,6 +15,7 @@ import Signup from "./pages/Signup";
 import MyResumes from "./pages/MyResumes";
 import Pricing from "./pages/Pricing";
 import Documentation from "./pages/Documentation";
+import About from "./pages/About";
 
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/my-resumes" element={<MyResumes />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/documentation" element={<Documentation />} />
+          <Route path="/about" element={<About />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="*" element={<NotFound />} />
