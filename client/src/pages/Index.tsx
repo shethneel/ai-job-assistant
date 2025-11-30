@@ -114,11 +114,11 @@ export default function Index() {
               ].map((item, idx) => {
                 const Icon = item.icon;
                 return (
-                  <div key={idx} className="relative">
+                  <div key={idx} className="relative h-full flex">
                     {idx < 2 && (
                       <div className="hidden md:block absolute top-1/3 left-full w-full h-1 bg-gradient-to-r from-blue-300 to-purple-300 -mx-8" />
                     )}
-                    <div className="relative bg-gradient-to-br from-gray-50 to-white p-8 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all">
+                    <div className="relative bg-gradient-to-br from-gray-50 to-white p-8 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all w-full h-full flex flex-col">
                       <p className="text-sm font-bold text-gray-400 mb-4">
                         {item.step}
                       </p>
