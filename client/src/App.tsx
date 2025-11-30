@@ -17,6 +17,8 @@ import Pricing from "./pages/Pricing";
 import Documentation from "./pages/Documentation";
 import About from "./pages/About";
 import Blog from "./pages/Blog";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy"
 
 
 export default function App() {
@@ -37,6 +39,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/blog" element={<Blog />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
