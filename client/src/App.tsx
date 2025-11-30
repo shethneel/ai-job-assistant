@@ -16,6 +16,7 @@ import MyResumes from "./pages/MyResumes";
 import Pricing from "./pages/Pricing";
 import Documentation from "./pages/Documentation";
 import About from "./pages/About";
+import Blog from "./pages/Blog";
 
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/about" element={<About />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/blog" element={<Blog />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
