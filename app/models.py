@@ -37,3 +37,29 @@ class UsageLog(SQLModel, table=True):
         default_factory=datetime.utcnow,
         index=True,
     )
+
+class UserProfile(SQLModel, table=True):
+    """
+    1:1 career profile for each user.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # one profile per user
+    user_id: int = Field(
+        foreign_key="user.id",
+        unique=True,
+        index=True,
+        description="FK to User.id – one profile per user",
+    )
+
+    # editable fields
+    experience_level: Optional[str] = None  # "student", "recent_grad", etc.
+    preferred_roles: Optional[str] = None   # comma-separated
+    preferred_industries: Optional[str] = None
+    preferred_locations: Optional[str] = None
+    skills: Optional[str] = None
+    work_authorization: Optional[str] = None
+    career_goal: Optional[str] = None
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

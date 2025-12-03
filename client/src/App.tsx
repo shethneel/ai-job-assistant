@@ -15,10 +15,11 @@ import Signup from "./pages/Signup";
 import MyResumes from "./pages/MyResumes";
 import Pricing from "./pages/Pricing";
 import Documentation from "./pages/Documentation";
+import Profile from "./pages/Profile";
 import About from "./pages/About";
 import Blog from "./pages/Blog";
 import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy"
+import Privacy from "./pages/Privacy";
 
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/blog" element={<Blog />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

@@ -15,6 +15,7 @@ from app.api.routes_auth import router as auth_router
 from app.api.routes_user_resume import router as user_resume_router
 from app.api.routes_job_match import router as job_match_router
 from app.api.routes_tailored_resume import router as tailored_resume_router
+from app.api.routes_profile import router as profile_router
 
 
 def create_app() -> FastAPI:
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(user_resume_router, tags=["user-resume"])
     app.include_router(job_match_router, tags=["job-match"])
     app.include_router(tailored_resume_router, tags=["tailored-resume"])
+    app.include_router(profile_router)
 
     @app.get("/")
     def root():

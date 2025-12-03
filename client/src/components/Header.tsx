@@ -225,6 +225,18 @@ export default function Header() {
                         type="button"
                         onClick={() => {
                           setProfileOpen(false);
+                          navigate("/profile");
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm font-medium text-gray-900 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
+                      >
+                        <User className="h-4 w-4 text-gray-500" />
+                        Profile
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
                           navigate("/settings");
                         }}
                         className="w-full text-left px-4 py-3 text-sm font-medium text-gray-900 hover:bg-blue-50 hover:text-blue-600 border-t border-gray-100 transition-colors flex items-center gap-2"
